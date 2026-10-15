@@ -10,7 +10,8 @@ import { H2, Loader, Muted, Notice, StatusBadge } from './ui';
 
 /** Pase QR. Sube el brillo de la pantalla mientras se muestra, para que el lector lo lea a la primera. */
 export function QrPass({ booking }: { booking: BookingDto }) {
-  const usable = booking.status === 'CONFIRMED' || booking.status === 'PENDING';
+  const usable = booking.status === 'CONFIRMED';
+  const pending = booking.status === 'PENDING';
   const qr = useQuery({
     queryKey: ['booking', booking.id, 'qr'],
     queryFn: () => api.get<BookingQrDto>(`/me/bookings/${booking.id}/qr`),
@@ -43,7 +44,7 @@ export function QrPass({ booking }: { booking: BookingDto }) {
         <Text style={p.brand}>VALORIZE</Text>
         <StatusBadge status={booking.status} />
       </View>
-      <View style={[p.tile, !usable && { opacity: 0.15 }]}>
+      <View style={[p.tile, !usable && { opacity: pending ? 0.3 : 0.15 }]}>
         {qr.data ? (
           <QRCode value={qr.data.token} size={220} color={c.ink} backgroundColor="#ffffff" ecl="M" />
         ) : (
@@ -52,7 +53,11 @@ export function QrPass({ booking }: { booking: BookingDto }) {
       </View>
       <Text style={p.ref}>{booking.reference}</Text>
       <Muted style={{ textAlign: 'center', fontSize: t.sm }}>
-        {usable ? 'Muéstralo al llegar. Si cambias la cita, se actualiza solo.' : 'Esta cita ya no tiene un QR válido.'}
+        {usable
+          ? 'Muéstralo al llegar. Si cambias la cita, se actualiza solo.'
+          : pending
+            ? 'Tu QR aparecerá aquí cuando aprobemos la solicitud.'
+            : 'Esta cita no tiene un QR válido.'}
       </Muted>
       <View style={p.tear} />
       <View style={p.meta}>

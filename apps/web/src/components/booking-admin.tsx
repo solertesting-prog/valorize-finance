@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { SlotPicker } from './booking';
+import { ExchangeSummary } from './exchange';
 import { useTransition } from './staff';
 import { Alert, Button, ErrorBox, KycBadge, Modal, Spinner, StatusBadge, TextInput, useToast } from './ui';
 import { api } from '@/lib/api';
@@ -87,6 +88,29 @@ export function BookingAdminView({ id, basePath, apiBase }: { id: string; basePa
               </>
             ) : null}
           </section>
+
+          {b.exchange ? (
+            <section className="card stack">
+              <div className="row between">
+                <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Operación de cambio</h2>
+                {apiBase === '/admin' ? (
+                  <Link className="small" href={`/admin/wallets/${b.exchange.wallet.id}`}>
+                    Auditoría de la wallet
+                  </Link>
+                ) : null}
+              </div>
+              <ExchangeSummary ex={b.exchange} staff />
+              {['CHECKED_IN', 'IN_SERVICE', 'COMPLETED'].includes(b.status) ? <SettlementForm booking={b} /> : null}
+            </section>
+          ) : null}
+
+          {b.status === 'PENDING' ? (
+            <Alert kind="warn">
+              Pendiente de aprobación.{' '}
+              {apiBase === '/admin' ? <Link href="/admin/solicitudes">Revisarla en Solicitudes</Link> : 'Un responsable debe aprobarla antes de la visita.'}
+            </Alert>
+          ) : null}
+          {b.status === 'REJECTED' ? <Alert kind="error">Rechazada: {b.rejectReason}</Alert> : null}
 
           <section className="card stack">
             <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Acciones</h2>
@@ -193,3 +217,48 @@ export function BookingAdminView({ id, basePath, apiBase }: { id: string; basePa
   );
 }
 
+
+/** Liquidación en oficina: tipo aplicado, euros entregados/recibidos y hash de la transacción. */
+function SettlementForm({ booking }: { booking: BookingDto }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const ex = booking.exchange!;
+  const [f, setF] = useState({ agreedRate: ex.agreedRate ?? '', fiatAmount: ex.fiatAmount ?? '', feeAmount: ex.feeAmount ?? '', txHash: ex.txHash ?? '' });
+  const m = useMutation({
+    mutationFn: () =>
+      api.post<BookingDto>(`/staff/bookings/${booking.id}/exchange`, {
+        agreedRate: f.agreedRate || undefined,
+        fiatAmount: f.fiatAmount || undefined,
+        feeAmount: f.feeAmount || undefined,
+        txHash: f.txHash || undefined,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff'] });
+      qc.invalidateQueries({ queryKey: ['admin'] });
+      toast('Datos de la operación guardados');
+    },
+  });
+  return (
+    <div className="stack" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+      <strong className="small">Liquidación</strong>
+      <div className="grid" style={{ '--min': '140px' } as React.CSSProperties}>
+        <TextInput label="Tipo aplicado (EUR)" inputMode="decimal" value={f.agreedRate} onChange={(e) => setF({ ...f, agreedRate: e.target.value })} />
+        <TextInput label="Euros" inputMode="decimal" value={f.fiatAmount} onChange={(e) => setF({ ...f, fiatAmount: e.target.value })} />
+        <TextInput label="Comisión (EUR)" inputMode="decimal" value={f.feeAmount} onChange={(e) => setF({ ...f, feeAmount: e.target.value })} />
+      </div>
+      <TextInput
+        label="Hash de la transacción"
+        className="input mono"
+        value={f.txHash}
+        onChange={(e) => setF({ ...f, txHash: e.target.value.trim() })}
+        hint={ex.direction === 'SELL_CRYPTO' ? 'Envío del cliente a la wallet de Valorize.' : 'Envío de Valorize a la wallet del cliente.'}
+      />
+      {m.error ? <Alert kind="error">{errorMessage(m.error)}</Alert> : null}
+      <div>
+        <Button onClick={() => m.mutate()} loading={m.isPending}>
+          Guardar liquidación
+        </Button>
+      </div>
+    </div>
+  );
+}

@@ -27,6 +27,7 @@ export const BookingStatus = {
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
   NO_SHOW: 'NO_SHOW',
+  REJECTED: 'REJECTED',
 } as const;
 export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];
 
@@ -40,13 +41,14 @@ export const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
 
 /** Transiciones permitidas de estado de una cita. */
 export const BOOKING_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  PENDING: ['CONFIRMED', 'CANCELLED'],
+  PENDING: ['CONFIRMED', 'CANCELLED', 'REJECTED'],
   CONFIRMED: ['CHECKED_IN', 'CANCELLED', 'NO_SHOW'],
   CHECKED_IN: ['IN_SERVICE', 'COMPLETED', 'CANCELLED'],
   IN_SERVICE: ['COMPLETED'],
   COMPLETED: [],
   CANCELLED: [],
   NO_SHOW: [],
+  REJECTED: [],
 };
 
 export const KycStatus = {
@@ -71,6 +73,8 @@ export const KycFieldType = {
 export type KycFieldType = (typeof KycFieldType)[keyof typeof KycFieldType];
 
 export const NotificationType = {
+  BOOKING_REQUESTED: 'BOOKING_REQUESTED',
+  BOOKING_REJECTED: 'BOOKING_REJECTED',
   BOOKING_CONFIRMED: 'BOOKING_CONFIRMED',
   BOOKING_RESCHEDULED: 'BOOKING_RESCHEDULED',
   BOOKING_CANCELLED: 'BOOKING_CANCELLED',
@@ -104,6 +108,8 @@ export const WebhookEvent = {
   USER_REGISTERED: 'user.registered',
   KYC_STATUS_CHANGED: 'kyc.status_changed',
   BOOKING_CREATED: 'booking.created',
+  BOOKING_REJECTED: 'booking.rejected',
+  WALLET_SCREENED: 'wallet.screened',
   BOOKING_CONFIRMED: 'booking.confirmed',
   BOOKING_RESCHEDULED: 'booking.rescheduled',
   BOOKING_CANCELLED: 'booking.cancelled',
@@ -119,13 +125,14 @@ export const VerificationChannel = { EMAIL: 'EMAIL', PHONE: 'PHONE' } as const;
 export type VerificationChannel = (typeof VerificationChannel)[keyof typeof VerificationChannel];
 
 export const BOOKING_STATUS_LABEL: Record<BookingStatus, string> = {
-  PENDING: 'Pendiente',
+  PENDING: 'Pendiente de aprobación',
   CONFIRMED: 'Confirmada',
   CHECKED_IN: 'Check-in hecho',
   IN_SERVICE: 'En atención',
   COMPLETED: 'Atendida',
   CANCELLED: 'Cancelada',
   NO_SHOW: 'No presentado',
+  REJECTED: 'Rechazada',
 };
 
 export const KYC_STATUS_LABEL: Record<KycStatus, string> = {
@@ -142,4 +149,55 @@ export const ROLE_LABEL: Record<Role, string> = {
   EMPLOYEE: 'Empleado',
   MANAGER: 'Responsable',
   ADMIN: 'Administrador',
+};
+
+// ───────── Cambio USDT / USDC ─────────
+
+export const ServiceKind = { GENERAL: 'GENERAL', CRYPTO_EXCHANGE: 'CRYPTO_EXCHANGE' } as const;
+export type ServiceKind = (typeof ServiceKind)[keyof typeof ServiceKind];
+
+export const ExchangeDirection = { SELL_CRYPTO: 'SELL_CRYPTO', BUY_CRYPTO: 'BUY_CRYPTO' } as const;
+export type ExchangeDirection = (typeof ExchangeDirection)[keyof typeof ExchangeDirection];
+
+export const CryptoAsset = { USDT: 'USDT', USDC: 'USDC' } as const;
+export type CryptoAsset = (typeof CryptoAsset)[keyof typeof CryptoAsset];
+
+export const ChainNetwork = { TRON: 'TRON', ETHEREUM: 'ETHEREUM', POLYGON: 'POLYGON', BSC: 'BSC' } as const;
+export type ChainNetwork = (typeof ChainNetwork)[keyof typeof ChainNetwork];
+
+export const WalletRiskStatus = { PENDING: 'PENDING', CLEAR: 'CLEAR', REVIEW: 'REVIEW', BLOCKED: 'BLOCKED' } as const;
+export type WalletRiskStatus = (typeof WalletRiskStatus)[keyof typeof WalletRiskStatus];
+
+export const DIRECTION_LABEL: Record<ExchangeDirection, string> = {
+  SELL_CRYPTO: 'Vender cripto (recibo euros)',
+  BUY_CRYPTO: 'Comprar cripto (pago en euros)',
+};
+export const DIRECTION_SHORT: Record<ExchangeDirection, string> = { SELL_CRYPTO: 'Venta', BUY_CRYPTO: 'Compra' };
+
+export const NETWORK_LABEL: Record<ChainNetwork, string> = {
+  TRON: 'TRON (TRC-20)',
+  ETHEREUM: 'Ethereum (ERC-20)',
+  POLYGON: 'Polygon',
+  BSC: 'BNB Chain (BEP-20)',
+};
+
+export const WALLET_RISK_LABEL: Record<WalletRiskStatus, string> = {
+  PENDING: 'Sin auditar',
+  CLEAR: 'Sin riesgos',
+  REVIEW: 'Revisar',
+  BLOCKED: 'Bloqueada',
+};
+
+/** Exploradores de bloques para enlazar direcciones desde el backoffice. */
+export const EXPLORER_ADDRESS_URL: Record<ChainNetwork, string> = {
+  TRON: 'https://tronscan.org/#/address/',
+  ETHEREUM: 'https://etherscan.io/address/',
+  POLYGON: 'https://polygonscan.com/address/',
+  BSC: 'https://bscscan.com/address/',
+};
+export const EXPLORER_TX_URL: Record<ChainNetwork, string> = {
+  TRON: 'https://tronscan.org/#/transaction/',
+  ETHEREUM: 'https://etherscan.io/tx/',
+  POLYGON: 'https://polygonscan.com/tx/',
+  BSC: 'https://bscscan.com/tx/',
 };

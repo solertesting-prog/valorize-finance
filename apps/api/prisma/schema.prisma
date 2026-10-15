@@ -67,16 +67,48 @@ enum FileStatus {
 }
 
 enum BookingStatus {
-  PENDING
+  PENDING // pendiente de aprobación por Valorize
   CONFIRMED
   CHECKED_IN
   IN_SERVICE
   COMPLETED
   CANCELLED
   NO_SHOW
+  REJECTED
+}
+
+enum ServiceKind {
+  GENERAL
+  CRYPTO_EXCHANGE
+}
+
+enum ExchangeDirection {
+  SELL_CRYPTO // el cliente entrega USDT/USDC y recibe euros
+  BUY_CRYPTO // el cliente paga euros y recibe USDT/USDC
+}
+
+enum CryptoAsset {
+  USDT
+  USDC
+}
+
+enum ChainNetwork {
+  TRON
+  ETHEREUM
+  POLYGON
+  BSC
+}
+
+enum WalletRiskStatus {
+  PENDING
+  CLEAR
+  REVIEW
+  BLOCKED
 }
 
 enum NotificationType {
+  BOOKING_REQUESTED
+  BOOKING_REJECTED
   BOOKING_CONFIRMED
   BOOKING_RESCHEDULED
   BOOKING_CANCELLED
@@ -154,6 +186,9 @@ model User {
   files              File[]
   bookings           Booking[]            @relation("BookingCustomer")
   checkIns           Booking[]            @relation("BookingCheckedInBy")
+  approvals          Booking[]            @relation("BookingApprovedBy")
+  wallets            CryptoWallet[]
+  walletReviews      WalletScreening[]    @relation("ScreeningReviewer")
   bookingEvents      BookingEvent[]
   notifications      Notification[]
   devices            PushDevice[]
@@ -353,11 +388,13 @@ model Service {
   description      String?  @db.VarChar(500)
   durationMin      Int
   bufferMin        Int      @default(0)
-  requiresKyc      Boolean  @default(false)
-  requiredKycLevel Int      @default(1)
-  active           Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  kind             ServiceKind @default(GENERAL)
+  requiresKyc      Boolean     @default(false)
+  requiredKycLevel Int         @default(1)
+  requiresApproval Boolean     @default(false) // la cita queda PENDING hasta que Valorize la aprueba
+  active           Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   locations LocationService[]
   bookings  Booking[]
@@ -412,11 +449,17 @@ model Booking {
   completedAt     DateTime?
   cancelledAt     DateTime?
   cancelReason    String?       @db.VarChar(300)
+  approvedAt      DateTime?
+  approvedById    String?       @db.Uuid
+  approvedBy      User?         @relation("BookingApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectedAt      DateTime?
+  rejectReason    String?       @db.VarChar(300)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
   events    BookingEvent[]
   incidents Incident[]
+  exchange  ExchangeRequest?
 
   @@index([locationId, startsAt])
   @@index([userId, startsAt])
@@ -554,4 +597,107 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([action, createdAt])
   @@map("audit_logs")
+}
+
+// ───────────────────────────── Cambio USDT / USDC ─────────────────────────────
+
+/// Solicitud de cambio asociada a una cita de un servicio CRYPTO_EXCHANGE.
+model ExchangeRequest {
+  id           String            @id @default(uuid()) @db.Uuid
+  bookingId    String            @unique @db.Uuid
+  booking      Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  direction    ExchangeDirection
+  asset        CryptoAsset
+  network      ChainNetwork
+  amount       Decimal           @db.Decimal(20, 6) // en unidades del token (USDT/USDC)
+  walletId     String            @db.Uuid
+  wallet       CryptoWallet      @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  /// Condiciones acordadas al aprobar (opcionales hasta entonces).
+  agreedRate   Decimal?          @db.Decimal(20, 8) // EUR por unidad
+  fiatAmount   Decimal?          @db.Decimal(20, 2) // EUR
+  feeAmount    Decimal?          @db.Decimal(20, 2) // EUR
+  internalNote String?           @db.VarChar(1000)
+  /// Al completar la operación en oficina.
+  txHash       String?           @db.VarChar(100)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([walletId])
+  @@map("exchange_requests")
+}
+
+/// Wallet declarada por un cliente. La misma dirección en otra red es otra wallet.
+model CryptoWallet {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @db.Uuid
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  network      ChainNetwork
+  address      String           @db.VarChar(100) // forma canónica (EVM en minúsculas, TRON en base58)
+  label        String?          @db.VarChar(60)
+  riskStatus   WalletRiskStatus @default(PENDING)
+  riskScore    Int?
+  lastScreenedAt DateTime?
+  archivedAt   DateTime?
+  createdAt    DateTime         @default(now())
+
+  screenings WalletScreening[]
+  exchanges  ExchangeRequest[]
+
+  @@unique([userId, network, address])
+  @@index([network, address])
+  @@map("crypto_wallets")
+}
+
+/// Resultado de una auditoría de wallet (inmutable; las revisiones manuales se registran aparte).
+model WalletScreening {
+  id           String           @id @default(uuid()) @db.Uuid
+  walletId     String           @db.Uuid
+  wallet       CryptoWallet     @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  status       WalletRiskStatus
+  riskScore    Int
+  providers    String[] // proveedores consultados: internal, chainalysis-sanctions, …
+  checks       Json // [{ code, label, result: pass|warn|fail|error|skip, detail }]
+  snapshot     Json? // datos on-chain observados (saldo, nº tx, antigüedad…)
+  reviewedById String?          @db.Uuid
+  reviewedBy   User?            @relation("ScreeningReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  reviewDecision WalletRiskStatus?
+  reviewNote   String?          @db.VarChar(1000)
+  createdAt    DateTime         @default(now())
+
+  @@index([walletId, createdAt])
+  @@map("wallet_screenings")
+}
+
+/// Direcciones sancionadas o bloqueadas (OFAC importado + lista interna).
+model BlockedAddress {
+  id        String   @id @default(uuid()) @db.Uuid
+  address   String   @db.VarChar(100) // minúsculas para EVM, base58 para TRON
+  source    String   @db.VarChar(40) // ofac | internal
+  reason    String?  @db.VarChar(300)
+  createdById String? @db.Uuid
+  createdAt DateTime @default(now())
+
+  @@unique([address, source])
+  @@index([address])
+  @@map("blocked_addresses")
+}
+
+/// Configuración del servicio de cambio (fila única id = 1).
+model ExchangeSettings {
+  id                 Int            @id @default(1)
+  enabledAssets      CryptoAsset[]  @default([USDT, USDC])
+  enabledNetworks    ChainNetwork[] @default([TRON, ETHEREUM, POLYGON, BSC])
+  sellEnabled        Boolean        @default(true)
+  buyEnabled         Boolean        @default(true)
+  minAmount          Decimal        @default(50) @db.Decimal(20, 6)
+  maxAmount          Decimal        @default(10000) @db.Decimal(20, 6)
+  dailyLimitPerUser  Decimal        @default(10000) @db.Decimal(20, 6)
+  monthlyLimitPerUser Decimal       @default(50000) @db.Decimal(20, 6)
+  /// Por encima de este importe se exige KYC de nivel 2.
+  enhancedKycAbove   Decimal        @default(1000) @db.Decimal(20, 6)
+  minWalletAgeDays   Int            @default(7)
+  updatedAt          DateTime       @updatedAt
+
+  @@map("exchange_settings")
 }

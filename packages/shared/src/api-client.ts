@@ -60,7 +60,7 @@ export function createApiClient(opts: ApiClientOptions) {
     const headers: Record<string, string> = { Accept: 'application/json', ...(opts.headers ?? {}) };
     const token = opts.getAccessToken();
     if (token) headers.Authorization = `Bearer ${token}`;
-    let body: BodyInit | undefined;
+    let body: string | undefined;
     if (ro.body !== undefined) {
       headers['Content-Type'] = 'application/json';
       body = JSON.stringify(ro.body);

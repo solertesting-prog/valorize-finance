@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import Redis from 'ioredis';
 import { REDIS } from '../common/common.module';
@@ -7,13 +7,14 @@ import { ENV, Env } from '../config/env';
 import { BookingsService } from '../bookings/bookings.service';
 import { KycService } from '../kyc/kyc.service';
 import { StorageService } from '../files/storage.service';
+import { WalletsService } from '../wallets/wallets.service';
 
 /**
  * Tareas periódicas. Con varias réplicas de la API, un lock en Redis garantiza
  * que cada tarea se ejecuta en una sola instancia.
  */
 @Injectable()
-export class JobsService {
+export class JobsService implements OnApplicationBootstrap {
   private readonly logger = new Logger(JobsService.name);
 
   constructor(
@@ -21,6 +22,7 @@ export class JobsService {
     private readonly bookings: BookingsService,
     private readonly kyc: KycService,
     private readonly storage: StorageService,
+    private readonly wallets: WalletsService,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(ENV) private readonly env: Env,
   ) {}
@@ -66,6 +68,18 @@ export class JobsService {
       }
       return expired.length ? { expired: expired.length } : null;
     });
+  }
+
+  /** Lista OFAC de direcciones sancionadas: al arrancar si está vacía y cada día. */
+  @Cron(CronExpression.EVERY_DAY_AT_4AM, { timeZone: 'Europe/Madrid' })
+  ofac() {
+    return this.exclusive('ofac', 600, () => this.wallets.syncOfac());
+  }
+
+  async onApplicationBootstrap() {
+    if (this.env.DISABLE_JOBS || this.env.SCREENING_OFFLINE) return;
+    const n = await this.prisma.blockedAddress.count({ where: { source: 'ofac' } });
+    if (!n) void this.ofac();
   }
 
   /** Limpieza: subidas abandonadas, códigos y sesiones caducadas. */

@@ -8,7 +8,18 @@ import { Alert, Button, ErrorBox, Modal, Spinner, TextInput, useToast } from '@/
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
-const blank = { code: '', name: '', description: '', durationMin: 15, bufferMin: 0, requiresKyc: false, requiredKycLevel: 1, active: true };
+const blank = {
+  code: '',
+  name: '',
+  description: '',
+  durationMin: 15,
+  bufferMin: 0,
+  kind: 'GENERAL' as ServiceDto['kind'],
+  requiresKyc: false,
+  requiredKycLevel: 1,
+  requiresApproval: false,
+  active: true,
+};
 
 export default function Services() {
   const { user } = useAuth();
@@ -37,7 +48,7 @@ export default function Services() {
       {q.data ? (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Gestión</th><th>Código</th><th>Duración</th><th>Margen</th><th>Requiere identidad</th><th>Estado</th><th /></tr></thead>
+            <thead><tr><th>Gestión</th><th>Código</th><th>Duración</th><th>Margen</th><th>Tipo</th><th>Requiere identidad</th><th>Estado</th><th /></tr></thead>
             <tbody>
               {q.data.map((s) => (
                 <tr key={s.id}>
@@ -45,6 +56,7 @@ export default function Services() {
                   <td className="mono">{s.code}</td>
                   <td className="mono">{s.durationMin} min</td>
                   <td className="mono">{s.bufferMin} min</td>
+                  <td>{s.kind === 'CRYPTO_EXCHANGE' ? 'Cambio cripto' : 'General'}{s.requiresApproval ? ' · con aprobación' : ''}</td>
                   <td>{s.requiresKyc ? `Sí (nivel ${s.requiredKycLevel})` : 'No'}</td>
                   <td><span className={`badge ${s.active ? 'ok' : ''}`}>{s.active ? 'Activa' : 'Inactiva'}</span></td>
                   <td>{isAdmin ? <Button size="sm" onClick={() => setEditing({ ...s, description: s.description ?? '' })}>Editar</Button> : null}</td>
@@ -69,6 +81,15 @@ export default function Services() {
               <TextInput label="Duración (min)" type="number" min={5} value={editing.durationMin} onChange={(e) => setEditing({ ...editing, durationMin: Number(e.target.value) })} />
               <TextInput label="Margen tras la cita (min)" type="number" min={0} value={editing.bufferMin} onChange={(e) => setEditing({ ...editing, bufferMin: Number(e.target.value) })} />
             </div>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={editing.kind === 'CRYPTO_EXCHANGE'}
+                onChange={(e) => setEditing({ ...editing, kind: e.target.checked ? 'CRYPTO_EXCHANGE' : 'GENERAL', ...(e.target.checked ? { requiresApproval: true, requiresKyc: true } : {}) })}
+              />
+              <span>Operación de cambio USDT/USDC (pide importe, red y wallet)</span>
+            </label>
+            <label className="check"><input type="checkbox" checked={editing.requiresApproval} onChange={(e) => setEditing({ ...editing, requiresApproval: e.target.checked })} /><span>Requiere aprobación antes de confirmar la cita</span></label>
             <label className="check"><input type="checkbox" checked={editing.requiresKyc} onChange={(e) => setEditing({ ...editing, requiresKyc: e.target.checked })} /><span>Requiere identidad verificada</span></label>
             {editing.requiresKyc ? <TextInput label="Nivel de verificación exigido" type="number" min={1} max={3} value={editing.requiredKycLevel} onChange={(e) => setEditing({ ...editing, requiredKycLevel: Number(e.target.value) })} /> : null}
             <label className="check"><input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} /><span>Activa</span></label>

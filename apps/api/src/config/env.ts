@@ -5,6 +5,9 @@ const bool = z
   .optional()
   .transform((v) => v === 'true' || v === '1');
 
+/** Variables opcionales que pueden venir vacías en el .env. */
+const optUrl = z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(4000),
@@ -57,6 +60,18 @@ const envSchema = z.object({
   CHECKIN_EARLY_MIN: z.coerce.number().default(60),
   REMINDER_HOURS_BEFORE: z.coerce.number().default(24),
   DISABLE_JOBS: bool,
+
+  // Auditoría de wallets (todo opcional: sin claves se usan los endpoints públicos)
+  RPC_ETHEREUM_URL: optUrl,
+  RPC_POLYGON_URL: optUrl,
+  RPC_BSC_URL: optUrl,
+  TRONGRID_URL: optUrl,
+  TRONGRID_API_KEY: z.string().optional(),
+  ETHERSCAN_API_KEY: z.string().optional(),
+  /** Clave gratuita de la API de sanciones de Chainalysis (https://go.chainalysis.com/free-sanctions-screening). */
+  CHAINALYSIS_SANCTIONS_API_KEY: z.string().optional(),
+  /** Desactiva las consultas on-chain (tests / entornos sin red). */
+  SCREENING_OFFLINE: bool,
 });
 
 export type Env = z.infer<typeof envSchema>;

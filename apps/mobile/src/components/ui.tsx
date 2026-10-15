@@ -165,6 +165,7 @@ const STATUS_TONE: Record<BookingStatus, keyof typeof TONE> = {
   COMPLETED: 'none',
   CANCELLED: 'bad',
   NO_SHOW: 'bad',
+  REJECTED: 'bad',
 };
 export const StatusBadge = ({ status }: { status: BookingStatus }) => <Badge label={BOOKING_STATUS_LABEL[status]} tone={STATUS_TONE[status]} />;
 

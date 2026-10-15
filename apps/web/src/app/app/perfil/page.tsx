@@ -1,7 +1,8 @@
 'use client';
 
 import type React from 'react';
-import { errorMessage, MeDto, updateProfileSchema } from '@valorize/shared';
+import { errorMessage, MeDto, NETWORK_LABEL, updateProfileSchema, WalletDto } from '@valorize/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
@@ -98,6 +99,8 @@ export default function Profile() {
         </div>
       </form>
 
+      <MyWallets />
+
       <Link href="/cuenta/seguridad" className="card card-link row between">
         <div>
           <div style={{ fontWeight: 700 }}>Seguridad y privacidad</div>
@@ -116,5 +119,38 @@ export default function Profile() {
         Cerrar sesión
       </Button>
     </div>
+  );
+}
+
+function MyWallets() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['me', 'wallets', 'all'], queryFn: () => api.get<WalletDto[]>('/me/wallets') });
+  const archive = useMutation({
+    mutationFn: (id: string) => api.delete(`/me/wallets/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['me', 'wallets'] }),
+  });
+  if (!q.data?.length) return null;
+  return (
+    <section className="card stack">
+      <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Mis wallets</h2>
+      {q.data.map((w) => (
+        <div key={w.id} className="row between" style={{ borderTop: '1px solid var(--line)', paddingTop: 10, flexWrap: 'nowrap' }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="small" style={{ fontWeight: 600 }}>
+              {w.label ?? 'Wallet'} · {NETWORK_LABEL[w.network]}
+            </div>
+            <div className="xs muted mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {w.address}
+            </div>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => archive.mutate(w.id)}>
+            Quitar
+          </Button>
+        </div>
+      ))}
+      <p className="xs muted" style={{ margin: 0 }}>
+        Puedes añadir otra wallet al solicitar un cambio.
+      </p>
+    </section>
   );
 }

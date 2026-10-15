@@ -11,7 +11,17 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 const SERVICES = [
-  { code: 'CAMBIO_PRESENCIAL', name: 'Cambio presencial', description: 'Operación de cambio en ventanilla.', durationMin: 15, bufferMin: 5, requiresKyc: true, requiredKycLevel: 1 },
+  {
+    code: 'CAMBIO_PRESENCIAL',
+    name: 'Cambio USDT / USDC',
+    description: 'Compra o venta de USDT y USDC en ventanilla. Requiere aprobación previa.',
+    durationMin: 20,
+    bufferMin: 5,
+    kind: 'CRYPTO_EXCHANGE' as const,
+    requiresKyc: true,
+    requiredKycLevel: 1,
+    requiresApproval: true,
+  },
   { code: 'ALTA_CLIENTE', name: 'Alta de cliente', description: 'Apertura y verificación presencial de cuenta.', durationMin: 30, bufferMin: 5, requiresKyc: false, requiredKycLevel: 1 },
   { code: 'ASESORAMIENTO', name: 'Asesoramiento', description: 'Reunión con un gestor.', durationMin: 45, bufferMin: 15, requiresKyc: true, requiredKycLevel: 1 },
   { code: 'GESTION_DOCUMENTAL', name: 'Gestión documental', description: 'Entrega o recogida de documentación.', durationMin: 15, bufferMin: 0, requiresKyc: false, requiredKycLevel: 1 },
@@ -80,6 +90,7 @@ async function main() {
   for (const s of SERVICES) {
     await prisma.service.upsert({ where: { code: s.code }, create: s, update: {} });
   }
+  await prisma.exchangeSettings.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
   const services = await prisma.service.findMany();
 
   for (const { hours, ...l } of LOCATIONS) {

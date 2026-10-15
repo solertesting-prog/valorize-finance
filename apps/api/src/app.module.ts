@@ -31,6 +31,11 @@ import { StaffController } from './staff/staff.controller';
 import { StaffService } from './staff/staff.service';
 import { MeController } from './users/me.controller';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { ExchangeService } from './bookings/exchange.service';
+import { OnchainService } from './wallets/onchain.service';
+import { WalletScreeningService } from './wallets/screening.service';
+import { AdminWalletsController, WalletsController } from './wallets/wallets.controller';
+import { WalletsService } from './wallets/wallets.service';
 
 @Module({
   imports: [
@@ -75,6 +80,8 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     BookingsController,
     StaffController,
     AdminController,
+    WalletsController,
+    AdminWalletsController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -91,6 +98,10 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     AdminUsersService,
     AnalyticsService,
     JobsService,
+    OnchainService,
+    WalletScreeningService,
+    WalletsService,
+    ExchangeService,
   ],
 })
 export class AppModule {}

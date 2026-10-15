@@ -16,7 +16,8 @@ import { Alert, Empty, ErrorBox, Spinner, StatusBadge } from './ui';
 
 /** El pase: QR firmado sobre baldosa blanca, referencia y datos de la cita. */
 export function QrPass({ booking }: { booking: BookingDto }) {
-  const usable = booking.status === 'CONFIRMED' || booking.status === 'PENDING';
+  const usable = booking.status === 'CONFIRMED';
+  const awaiting = booking.status === 'PENDING';
   const qr = useQuery({
     queryKey: ['booking', booking.id, 'qr'],
     queryFn: () => api.get<BookingQrDto>(`/me/bookings/${booking.id}/qr`),
@@ -44,6 +45,10 @@ export function QrPass({ booking }: { booking: BookingDto }) {
       {usable ? (
         <p className="small muted" style={{ margin: '8px auto 0' }}>
           Muéstralo al llegar. Si cambias la cita, este código se actualiza solo.
+        </p>
+      ) : awaiting ? (
+        <p className="small" style={{ margin: '8px auto 0', color: 'var(--amber)' }}>
+          Estamos revisando tu solicitud. El QR aparecerá aquí en cuanto la aprobemos y te avisaremos.
         </p>
       ) : (
         <p className="small muted" style={{ margin: '8px auto 0' }}>

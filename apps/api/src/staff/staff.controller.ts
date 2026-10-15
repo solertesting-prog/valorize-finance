@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { BookingStatus, IncidentStatus, incidentSchema, incidentUpdateSchema, isoDate, paginationSchema, scanSchema, staffTransitionSchema, uuid } from '@valorize/shared';
+import { BookingStatus, completeExchangeSchema, IncidentStatus, incidentSchema, incidentUpdateSchema, isoDate, paginationSchema, scanSchema, staffTransitionSchema, uuid } from '@valorize/shared';
 import { z } from 'zod';
 import { AuthUser, CurrentUser, ReqMeta, RequestMeta, Roles } from '../common/auth.decorators';
 import { ZodPipe } from '../common/zod-validation.pipe';
@@ -81,6 +81,16 @@ export class StaffController {
     await this.bookings.assertStaffLocation(u, existing.locationId);
     if (b.locationId) await this.bookings.assertStaffLocation(u, b.locationId);
     return this.bookings.reschedule(u, id, b.startsAt, b.locationId, meta);
+  }
+
+  @Post('bookings/:id/exchange')
+  settlement(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(completeExchangeSchema)) b: z.infer<typeof completeExchangeSchema>,
+    @ReqMeta() meta: RequestMeta,
+  ) {
+    return this.bookings.updateExchangeSettlement(u, id, b, meta);
   }
 
   @Get('incidents')

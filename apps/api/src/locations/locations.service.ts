@@ -193,8 +193,10 @@ function serviceDto(s: {
   description: string | null;
   durationMin: number;
   bufferMin: number;
+  kind: ServiceDto['kind'];
   requiresKyc: boolean;
   requiredKycLevel: number;
+  requiresApproval: boolean;
   active: boolean;
 }): ServiceDto {
   return {
@@ -204,8 +206,10 @@ function serviceDto(s: {
     description: s.description,
     durationMin: s.durationMin,
     bufferMin: s.bufferMin,
+    kind: s.kind,
     requiresKyc: s.requiresKyc,
     requiredKycLevel: s.requiredKycLevel,
+    requiresApproval: s.requiresApproval,
     active: s.active,
   };
 }

@@ -145,6 +145,7 @@ const STATUS_TONE: Record<BookingStatus, string> = {
   COMPLETED: '',
   CANCELLED: 'bad',
   NO_SHOW: 'bad',
+  REJECTED: 'bad',
 };
 
 export function StatusBadge({ status }: { status: BookingStatus }) {
@@ -270,6 +271,9 @@ const paths: Record<string, string> = {
   x: 'M6 6l12 12M18 6L6 18',
   logout: 'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11',
   doc: 'M7 3h7l5 5v13H7zM14 3v5h5',
+  inbox: 'M3 13h5l2 3h4l2-3h5M5 5h14l2 8v6H3v-6z',
+  wallet: 'M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 7l12-4v4M16 13h.01',
+  sliders: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4',
 };
 
 export function Icon({ name, size = 20 }: { name: keyof typeof paths | string; size?: number }) {

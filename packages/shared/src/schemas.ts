@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import {
   BookingStatus,
+  ChainNetwork,
+  CryptoAsset,
+  ExchangeDirection,
+  ServiceKind,
+  WalletRiskStatus,
   IncidentStatus,
   IncidentType,
   KycFieldType,
@@ -192,8 +197,10 @@ export const serviceSchema = z.object({
   description: z.string().trim().max(500).optional().nullable(),
   durationMin: z.number().int().min(5).max(480),
   bufferMin: z.number().int().min(0).max(120).default(0),
+  kind: z.enum(values(ServiceKind)).default('GENERAL'),
   requiresKyc: z.boolean().default(false),
   requiredKycLevel: z.number().int().min(1).max(3).default(1),
+  requiresApproval: z.boolean().default(false),
   active: z.boolean().default(true),
 });
 export type ServiceInput = z.infer<typeof serviceSchema>;
@@ -212,11 +219,50 @@ export const availabilityQuerySchema = z.object({
   date: isoDate,
 });
 
+// ---------- Cambio cripto ----------
+/** Validación de forma (rápida, en cliente). La API hace además la validación completa con checksum. */
+export const walletAddressShape: Record<ChainNetwork, RegExp> = {
+  TRON: /^T[1-9A-HJ-NP-Za-km-z]{33}$/,
+  ETHEREUM: /^0x[0-9a-fA-F]{40}$/,
+  POLYGON: /^0x[0-9a-fA-F]{40}$/,
+  BSC: /^0x[0-9a-fA-F]{40}$/,
+};
+
+export const walletInputSchema = z
+  .object({
+    network: z.enum(values(ChainNetwork)),
+    address: z.string().trim().min(10).max(100),
+    label: z.string().trim().max(60).optional(),
+  })
+  .refine((w) => walletAddressShape[w.network].test(w.address), {
+    message: 'La dirección no tiene el formato de esa red',
+    path: ['address'],
+  });
+export type WalletInput = z.infer<typeof walletInputSchema>;
+
+const amountString = z
+  .union([z.string(), z.number()])
+  .transform((v) => String(v).replace(',', '.').trim())
+  .refine((v) => /^\d{1,12}(\.\d{1,6})?$/.test(v) && Number(v) > 0, 'Importe no válido');
+
+export const exchangeInputSchema = z
+  .object({
+    direction: z.enum(values(ExchangeDirection)),
+    asset: z.enum(values(CryptoAsset)),
+    network: z.enum(values(ChainNetwork)),
+    amount: amountString,
+    walletId: uuid.optional(),
+    wallet: walletInputSchema.optional(),
+  })
+  .refine((e) => !!e.walletId !== !!e.wallet, { message: 'Indica una wallet', path: ['wallet'] });
+export type ExchangeInput = z.infer<typeof exchangeInputSchema>;
+
 export const createBookingSchema = z.object({
   locationId: uuid,
   serviceId: uuid,
   startsAt: z.string().datetime({ offset: true }),
   notes: z.string().trim().max(500).optional(),
+  exchange: exchangeInputSchema.optional(),
 });
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 
@@ -297,4 +343,63 @@ export const auditQuerySchema = paginationSchema.extend({
   entityType: z.string().max(40).optional(),
   entityId: z.string().max(64).optional(),
   action: z.string().max(80).optional(),
+});
+
+// ---------- Aprobación y wallets (admin) ----------
+const optionalDecimal = z
+  .union([z.string(), z.number()])
+  .transform((v) => String(v).replace(',', '.').trim())
+  .refine((v) => v === '' || (/^\d{1,12}(\.\d{1,8})?$/.test(v) && Number(v) >= 0), 'Número no válido')
+  .transform((v) => (v === '' ? undefined : v))
+  .optional();
+
+export const approveBookingSchema = z.object({
+  agreedRate: optionalDecimal,
+  fiatAmount: optionalDecimal,
+  feeAmount: optionalDecimal,
+  note: z.string().trim().max(1000).optional(),
+  /** Aprobar aunque la wallet esté en "Revisar" (queda registrado). */
+  overrideWalletReview: z.boolean().default(false),
+});
+export type ApproveBookingInput = z.infer<typeof approveBookingSchema>;
+
+export const rejectBookingSchema = z.object({
+  reason: z.string().trim().min(3, 'Indica el motivo').max(300),
+});
+
+export const walletReviewSchema = z.object({
+  decision: z.enum(['CLEAR', 'BLOCKED']),
+  note: z.string().trim().min(3, 'Explica la decisión').max(1000),
+});
+
+export const blockedAddressSchema = z.object({
+  address: z.string().trim().min(10).max(100),
+  reason: z.string().trim().max(300).optional(),
+});
+
+export const exchangeSettingsSchema = z.object({
+  enabledAssets: z.array(z.enum(values(CryptoAsset))).min(1),
+  enabledNetworks: z.array(z.enum(values(ChainNetwork))).min(1),
+  sellEnabled: z.boolean(),
+  buyEnabled: z.boolean(),
+  minAmount: amountString,
+  maxAmount: amountString,
+  dailyLimitPerUser: amountString,
+  monthlyLimitPerUser: amountString,
+  enhancedKycAbove: amountString,
+  minWalletAgeDays: z.number().int().min(0).max(3650),
+});
+export type ExchangeSettingsInput = z.infer<typeof exchangeSettingsSchema>;
+
+export const walletListQuerySchema = paginationSchema.extend({
+  riskStatus: z.enum(values(WalletRiskStatus)).optional(),
+  network: z.enum(values(ChainNetwork)).optional(),
+});
+
+export const completeExchangeSchema = z.object({
+  txHash: z.string().trim().max(100).optional(),
+  agreedRate: optionalDecimal,
+  fiatAmount: optionalDecimal,
+  feeAmount: optionalDecimal,
+  note: z.string().trim().max(300).optional(),
 });

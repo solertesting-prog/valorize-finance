@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { Badge, Body, Button, Card, Field, H1, H2, KycBadge, Muted, Notice, Row, Screen } from '@/components/ui';
+import { MyWallets } from '@/components/exchange';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -58,6 +59,10 @@ export default function Profile() {
         <Field label="Teléfono móvil" value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} keyboardType="phone-pad" hint="Si lo cambias, tendrás que verificarlo de nuevo." />
         {error ? <Notice kind="error">{error}</Notice> : null}
         <Button title="Guardar cambios" variant="primary" onPress={save} loading={busy} />
+      </Card>
+      <Card>
+        <H2>Mis wallets</H2>
+        <MyWallets />
       </Card>
       <Card onPress={() => router.push('/security')}>
         <Row style={{ justifyContent: 'space-between' }}>

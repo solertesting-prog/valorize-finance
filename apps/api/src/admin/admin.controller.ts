@@ -3,6 +3,9 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import {
   adminUserCreateSchema,
+  approveBookingSchema,
+  rejectBookingSchema,
+  uuid,
   adminUserUpdateSchema,
   analyticsQuerySchema,
   auditQuerySchema,
@@ -22,8 +25,11 @@ import { ZodPipe } from '../common/zod-validation.pipe';
 import { bookingInclude } from '../bookings/booking.mapper';
 import { BookingsService } from '../bookings/bookings.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { WalletsService } from '../wallets/wallets.service';
 import { AdminUsersService } from './admin-users.service';
 import { AnalyticsService } from './analytics.service';
+
+const approvalsQuery = z.object({ locationId: uuid.optional() });
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -36,7 +42,41 @@ export class AdminController {
     private readonly bookings: BookingsService,
     private readonly analytics: AnalyticsService,
     private readonly webhooks: WebhooksService,
+    private readonly wallets: WalletsService,
   ) {}
+
+  // ─────────── Aprobación de solicitudes ───────────
+
+  @Get('approvals')
+  async approvals(@Query(new ZodPipe(approvalsQuery)) q: z.infer<typeof approvalsQuery>) {
+    const rows = await this.bookings.pendingApprovals(q.locationId);
+    return Promise.all(
+      rows.map(async (b) => ({
+        booking: this.bookings.dto(b, true),
+        screening: b.exchange ? await this.wallets.latestScreening(b.exchange.walletId) : null,
+      })),
+    );
+  }
+
+  @Post('bookings/:id/approve')
+  approve(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(approveBookingSchema)) b: z.infer<typeof approveBookingSchema>,
+    @ReqMeta() meta: RequestMeta,
+  ) {
+    return this.bookings.approve(u, id, b, meta);
+  }
+
+  @Post('bookings/:id/reject')
+  reject(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(rejectBookingSchema)) b: z.infer<typeof rejectBookingSchema>,
+    @ReqMeta() meta: RequestMeta,
+  ) {
+    return this.bookings.reject(u, id, b.reason, meta);
+  }
 
   // ─────────── Usuarios y roles ───────────
 

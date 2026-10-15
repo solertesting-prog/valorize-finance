@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useStaffLocation } from '@/components/shells';
 import { useTransition } from '@/components/staff';
+import { ExchangeSummary } from '@/components/exchange';
 import { Alert, Button, KycBadge, StatusBadge, TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -17,6 +18,7 @@ const REASON: Record<NonNullable<ScanResultDto['reason']>, string> = {
   CANCELLED: 'La cita está cancelada',
   ALREADY_USED: 'Este QR ya se ha usado',
   EXPIRED: 'QR caducado',
+  NOT_APPROVED: 'Solicitud sin aprobar',
 };
 
 type Scanner = { start: () => Promise<void>; stop: () => void; destroy: () => void };
@@ -163,6 +165,11 @@ export default function ScanPage() {
                   <div className="small muted">
                     {b.service.name} · {b.location.name} · {formatTime(b.startsAt, b.location.timezone)}
                   </div>
+                  {b.exchange ? (
+                    <div className="card flat" style={{ padding: 12 }}>
+                      <ExchangeSummary ex={b.exchange} staff />
+                    </div>
+                  ) : null}
                   <div>
                     <StatusBadge status={b.status} />
                   </div>

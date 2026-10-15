@@ -1,5 +1,10 @@
 import type {
   BookingStatus,
+  ChainNetwork,
+  CryptoAsset,
+  ExchangeDirection,
+  ServiceKind,
+  WalletRiskStatus,
   IncidentStatus,
   IncidentType,
   KycFieldType,
@@ -75,8 +80,10 @@ export interface ServiceDto {
   description: string | null;
   durationMin: number;
   bufferMin: number;
+  kind: ServiceKind;
   requiresKyc: boolean;
   requiredKycLevel: number;
+  requiresApproval: boolean;
   active: boolean;
 }
 
@@ -129,13 +136,17 @@ export interface BookingDto {
   endsAt: string;
   notes: string | null;
   location: Pick<LocationDto, 'id' | 'name' | 'address' | 'city' | 'timezone' | 'latitude' | 'longitude'>;
-  service: Pick<ServiceDto, 'id' | 'code' | 'name' | 'durationMin'>;
+  service: Pick<ServiceDto, 'id' | 'code' | 'name' | 'durationMin' | 'kind'>;
   customer?: { id: string; firstName: string; lastName: string; email: string; phone: string | null; kycStatus: KycStatus };
   checkedInAt: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
   cancelReason: string | null;
   rescheduleCount: number;
+  approvedAt: string | null;
+  rejectedAt: string | null;
+  rejectReason: string | null;
+  exchange: ExchangeDto | null;
   canCancel: boolean;
   canReschedule: boolean;
   createdAt: string;
@@ -158,7 +169,7 @@ export interface BookingQrDto {
 
 export interface ScanResultDto {
   valid: boolean;
-  reason?: 'INVALID_TOKEN' | 'NOT_FOUND' | 'WRONG_LOCATION' | 'WRONG_DAY' | 'CANCELLED' | 'ALREADY_USED' | 'EXPIRED';
+  reason?: 'INVALID_TOKEN' | 'NOT_FOUND' | 'WRONG_LOCATION' | 'WRONG_DAY' | 'CANCELLED' | 'ALREADY_USED' | 'EXPIRED' | 'NOT_APPROVED';
   booking?: BookingDto;
   warnings: string[];
 }
@@ -302,4 +313,86 @@ export interface SessionDto {
   createdAt: string;
   lastUsedAt: string | null;
   current: boolean;
+}
+
+// ───────── Cambio USDT / USDC ─────────
+
+export interface WalletDto {
+  id: string;
+  network: ChainNetwork;
+  address: string;
+  label: string | null;
+  riskStatus: WalletRiskStatus;
+  riskScore: number | null;
+  lastScreenedAt: string | null;
+  createdAt: string;
+}
+
+export interface ExchangeDto {
+  id: string;
+  direction: ExchangeDirection;
+  asset: CryptoAsset;
+  network: ChainNetwork;
+  amount: string;
+  wallet: WalletDto;
+  agreedRate: string | null;
+  fiatAmount: string | null;
+  feeAmount: string | null;
+  txHash: string | null;
+  /** Solo visible para personal. */
+  internalNote?: string | null;
+}
+
+export type CheckResult = 'pass' | 'warn' | 'fail' | 'error' | 'skip';
+
+export interface ScreeningCheckDto {
+  code: string;
+  label: string;
+  result: CheckResult;
+  detail: string;
+  provider: string;
+}
+
+export interface WalletScreeningDto {
+  id: string;
+  status: WalletRiskStatus;
+  riskScore: number;
+  providers: string[];
+  checks: ScreeningCheckDto[];
+  snapshot: Record<string, unknown> | null;
+  reviewedBy: { id: string; name: string } | null;
+  reviewedAt: string | null;
+  reviewDecision: WalletRiskStatus | null;
+  reviewNote: string | null;
+  createdAt: string;
+}
+
+export interface AdminWalletDto extends WalletDto {
+  owner: { id: string; name: string; email: string };
+  sharedWithOtherCustomers: number;
+  exchangeCount: number;
+}
+
+export interface AdminWalletDetailDto {
+  wallet: AdminWalletDto;
+  screenings: WalletScreeningDto[];
+  exchanges: { bookingId: string; reference: string; status: BookingStatus; direction: ExchangeDirection; asset: CryptoAsset; amount: string; startsAt: string }[];
+}
+
+export interface ExchangeSettingsDto {
+  enabledAssets: CryptoAsset[];
+  enabledNetworks: ChainNetwork[];
+  sellEnabled: boolean;
+  buyEnabled: boolean;
+  minAmount: string;
+  maxAmount: string;
+  dailyLimitPerUser: string;
+  monthlyLimitPerUser: string;
+  enhancedKycAbove: string;
+  minWalletAgeDays: number;
+}
+
+export interface PendingApprovalDto {
+  booking: BookingDto;
+  screening: WalletScreeningDto | null;
 }

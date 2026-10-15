@@ -92,11 +92,14 @@ const STAFF_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { href: '/admin', label: 'Analítica', icon: 'chart', exact: true },
+  { href: '/admin/solicitudes', label: 'Solicitudes', icon: 'inbox' },
   { href: '/admin/citas', label: 'Citas', icon: 'calendar' },
+  { href: '/admin/wallets', label: 'Wallets', icon: 'wallet' },
   { href: '/admin/clientes', label: 'Clientes', icon: 'users' },
   { href: '/admin/verificaciones', label: 'Verificaciones', icon: 'shield' },
   { href: '/admin/ubicaciones', label: 'Ubicaciones', icon: 'building' },
   { href: '/admin/servicios', label: 'Servicios', icon: 'tag' },
+  { href: '/admin/cambio', label: 'Cambio cripto', icon: 'sliders' },
   { href: '/admin/equipo', label: 'Equipo y roles', icon: 'user' },
   { href: '/admin/requisitos-kyc', label: 'Requisitos KYC', icon: 'doc', roles: ['ADMIN'] },
   { href: '/admin/webhooks', label: 'Webhooks', icon: 'link', roles: ['ADMIN'] },
@@ -105,12 +108,19 @@ const ADMIN_NAV: NavItem[] = [
 
 export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin'; children: ReactNode; toolbar?: ReactNode }) {
   const { ready, user } = useRequireRole(area === 'admin' ? ADMIN_ROLES : STAFF_ROLES);
+  const pending = useQuery({
+    queryKey: ['admin', 'approvals', ''],
+    queryFn: () => api.get<unknown[]>('/admin/approvals'),
+    enabled: ready && area === 'admin',
+    refetchInterval: 60_000,
+  });
   const { logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   if (!ready || !user) return <Spinner />;
 
   const nav = (area === 'admin' ? ADMIN_NAV : STAFF_NAV).filter((n) => !n.roles || n.roles.includes(user.role));
+  const pendingCount = pending.data?.length ?? 0;
   const otherArea = area === 'admin' ? { href: '/panel', label: 'Ir al panel de atención' } : ADMIN_ROLES.includes(user.role) ? { href: '/admin', label: 'Ir al backoffice' } : null;
 
   return (
@@ -122,7 +132,12 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
         {nav.map((n) => (
           <Link key={n.href} href={n.href} className="nav" aria-current={isActive(pathname, n.href, n.exact) ? 'page' : undefined}>
             <Icon name={n.icon} />
-            {n.label}
+            <span className="grow">{n.label}</span>
+            {n.href === '/admin/solicitudes' && pendingCount ? (
+              <span className="badge warn" aria-label={`${pendingCount} pendientes`}>
+                {pendingCount}
+              </span>
+            ) : null}
           </Link>
         ))}
         {otherArea ? (
@@ -160,6 +175,7 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
           {nav.map((n) => (
             <Link key={n.href} href={n.href} aria-current={isActive(pathname, n.href, n.exact) ? 'page' : undefined}>
               {n.label}
+              {n.href === '/admin/solicitudes' && pendingCount ? ` (${pendingCount})` : ''}
             </Link>
           ))}
         </nav>

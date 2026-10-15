@@ -118,6 +118,24 @@ Hay hasta 8 reintentos con backoff exponencial. Los payloads no llevan datos per
 
 Por ubicación, desde el backoffice: puestos simultáneos, intervalo entre horas, antelación mínima, horizonte de reserva, horarios por tramos, cierres y servicios con límite propio.
 
+## Cambio USDT / USDC y auditoría de wallets
+
+- El servicio de tipo **Cambio cripto** (`kind = CRYPTO_EXCHANGE`) añade un paso al reservar: sentido (vender o comprar cripto), moneda (USDT/USDC), red (TRON, Ethereum, Polygon, BNB Chain), importe y wallet del cliente.
+- Los servicios con `requiresApproval` crean la cita en **Pendiente de aprobación**. El QR solo se emite al aprobarla desde **Backoffice → Solicitudes**. Si se rechaza, el cliente recibe el motivo.
+- Cada wallet se audita al enviarse y se reutiliza el resultado durante 24 h:
+  - formato y checksum de la dirección;
+  - lista de sanciones OFAC (sincronizada cada noche) y lista interna de Valorize;
+  - congelación por el emisor (Tether `isBlackListed`, Circle `isBlacklisted`);
+  - saldo en la red;
+  - antigüedad de la wallet;
+  - wallet compartida entre clientes;
+  - opcionalmente, la API de sanciones de Chainalysis.
+- Resultado: **Sin riesgo**, **Revisar** o **Bloqueada**. Al cliente nunca se le muestra "Bloqueada"; solo se le dice que no podemos operar con esa wallet.
+- Una wallet en *Revisar* se puede aprobar como excepción, y queda registrada en la auditoría.
+- Límites (mínimo/máximo por operación, diario, mensual, umbral de KYC ampliado y antigüedad mínima) se configuran en **Backoffice → Cambio cripto**.
+- Variables opcionales en `.env`: `ETHERSCAN_API_KEY` (antigüedad en redes EVM), `TRONGRID_API_KEY`, `CHAINALYSIS_SANCTIONS_API_KEY`, `RPC_*_URL`, y `SCREENING_OFFLINE=true` para desarrollo sin red.
+- El proveedor de screening es intercambiable (`ScreeningProvider`) para conectar más adelante Chainalysis KYT, Elliptic o TRM.
+
 ## Estado de verificación
 
 Durante la construcción no hubo acceso al registro npm, así que no se pudieron instalar dependencias ni ejecutar `next build` o `nest build`. Lo que sí se verificó:

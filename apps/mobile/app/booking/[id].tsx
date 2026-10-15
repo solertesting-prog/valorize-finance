@@ -4,7 +4,8 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { QrPass, SlotPicker } from '@/components/booking';
-import { Body, Button, Card, Field, Loader, Muted, Notice, Screen } from '@/components/ui';
+import { ExchangeSummary } from '@/components/exchange';
+import { Body, Button, Card, Field, H2, Loader, Muted, Notice, Screen } from '@/components/ui';
 import { api } from '@/lib/api';
 
 export default function BookingScreen() {
@@ -24,7 +25,7 @@ export default function BookingScreen() {
     setStartsAt(null);
     Alert.alert(msg);
   };
-  const reschedule = useMutation({ mutationFn: () => api.post<BookingDto>(`/me/bookings/${id}/reschedule`, { startsAt }), onSuccess: after('Cita cambiada. Tu QR se ha actualizado.') });
+  const reschedule = useMutation({ mutationFn: () => api.post<BookingDto>(`/me/bookings/${id}/reschedule`, { startsAt }), onSuccess: (nb) => after(nb.status === 'PENDING' ? 'Cita cambiada. La revisaremos de nuevo.' : 'Cita cambiada. Tu QR se ha actualizado.')(nb) });
   const cancel = useMutation({ mutationFn: () => api.post<BookingDto>(`/me/bookings/${id}/cancel`, { reason: reason || undefined }), onSuccess: after('Cita cancelada') });
 
   if (q.isLoading) return <Loader />;
@@ -33,7 +34,22 @@ export default function BookingScreen() {
 
   return (
     <Screen edges={['bottom']} refreshing={q.isRefetching} onRefresh={() => q.refetch()}>
+      {b.status === 'PENDING' ? (
+        <Notice kind="warn">Estamos revisando tu solicitud. Te avisaremos en cuanto la aprobemos y entonces verás aquí tu QR.</Notice>
+      ) : null}
+      {b.status === 'REJECTED' ? (
+        <Notice kind="error">No hemos podido aceptar esta solicitud.{b.rejectReason ? ` Motivo: ${b.rejectReason}` : ''}</Notice>
+      ) : null}
       <QrPass booking={b} />
+      {b.exchange ? (
+        <Card>
+          <H2>Tu operación</H2>
+          <ExchangeSummary ex={b.exchange} />
+          {b.exchange.direction === 'SELL_CRYPTO' && b.status === 'CONFIRMED' ? (
+            <Muted style={{ fontSize: 13 }}>Envía los fondos solo desde esta wallet y en la oficina, cuando te lo indique el personal.</Muted>
+          ) : null}
+        </Card>
+      ) : null}
       <Card>
         <Muted>Dirección</Muted>
         <Body>
@@ -65,6 +81,9 @@ export default function BookingScreen() {
             value={startsAt}
             onChange={setStartsAt}
           />
+          {b.status === 'CONFIRMED' && b.approvedAt ? (
+            <Notice kind="warn">Al cambiar la hora, la solicitud vuelve a revisión y el QR actual deja de valer hasta que la aprobemos.</Notice>
+          ) : null}
           {reschedule.error ? <Notice kind="error">{errorMessage(reschedule.error)}</Notice> : null}
           <Button title="Guardar cambio" variant="primary" disabled={!startsAt} loading={reschedule.isPending} onPress={() => reschedule.mutate()} />
           <Button title="Volver" variant="ghost" onPress={() => setMode('none')} />
