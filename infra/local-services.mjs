@@ -142,8 +142,8 @@ async function startPostgres() {
     if (r.status !== 0) throw new Error('No se pudo instalar embedded-postgres');
   }
   const pkg = JSON.parse(readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
-  const exp = pkg.exports?.['.'];
-  const entry = (typeof exp === 'string' ? exp : (exp?.import?.default ?? exp?.import ?? exp?.default)) ?? pkg.module ?? pkg.main;
+  const exp = typeof pkg.exports === 'string' ? pkg.exports : pkg.exports?.['.'];
+  const entry = (typeof exp === 'string' ? exp : (exp?.import?.default ?? exp?.import ?? exp?.default)) ?? pkg.module ?? pkg.main ?? 'index.js';
   const mod = await import(pathToFileURL(path.join(pkgDir, entry)).href);
   const EmbeddedPostgres = mod.default ?? mod.EmbeddedPostgres;
 
