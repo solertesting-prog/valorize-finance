@@ -7,7 +7,7 @@
  * Descarga la primera vez, en .local-services/ (ignorado por git):
  *   - PostgreSQL embebido (paquete npm "embedded-postgres")  → localhost:5432  (valorize/valorize)
  *   - Redis para Windows (redis-windows/redis-windows)        → localhost:6379
- *   - MinIO (S3 compatible)                                   → localhost:9000  consola :9001
+ *   - SeaweedFS (almacenamiento S3 compatible)                → localhost:9000
  *   - Mailpit (bandeja de correo de pruebas)                  → SMTP :1025, web http://localhost:8025
  *
  * Mantén esta ventana abierta mientras desarrollas. Ctrl+C para pararlo todo.
@@ -102,10 +102,14 @@ async function ensureZipTool(name, exe, repo, pattern) {
   return file;
 }
 
-async function ensureMinio() {
-  const file = path.join(BIN, 'minio.exe');
-  if (!existsSync(file)) await download('https://dl.min.io/server/minio/release/windows-amd64/minio.exe', file);
-  return file;
+async function ensureStorage() {
+  // MinIO ya no publica binarios para Windows; SeaweedFS ofrece una API S3 compatible.
+  try {
+    return await ensureZipTool('seaweedfs', 'weed.exe', 'seaweedfs/seaweedfs', /^windows_amd64\.zip$/);
+  } catch (e) {
+    log(`AVISO: no se pudo preparar el almacenamiento S3 (${e.message}). Todo funciona salvo la subida de documentos KYC.`);
+    return null;
+  }
 }
 
 function run(name, cmd, args, env = {}) {
@@ -187,36 +191,40 @@ async function main() {
   mkdirSync(DATA, { recursive: true });
   rmSync(READY, { force: true });
 
-  for (const [port, name] of [[5432, 'PostgreSQL'], [6379, 'Redis'], [9000, 'MinIO'], [1025, 'Mailpit']]) {
+  for (const [port, name] of [[5432, 'PostgreSQL'], [6379, 'Redis'], [9000, 'Almacenamiento S3'], [1025, 'Mailpit']]) {
     if (await portBusy(port)) throw new Error(`El puerto ${port} (${name}) ya está en uso. Cierra el programa que lo usa o una ejecución anterior de este script.`);
   }
 
-  const [redis, mailpit, minio] = await Promise.all([
+  const [redis, mailpit, storage] = await Promise.all([
     ensureZipTool('redis', 'redis-server.exe', 'redis-windows/redis-windows', /Windows-x64-msys2\.zip$/),
     ensureZipTool('mailpit', 'mailpit.exe', 'axllent/mailpit', /windows-amd64\.zip$/),
-    ensureMinio(),
+    ensureStorage(),
   ]);
 
   log('Arrancando PostgreSQL...');
   await startPostgres();
 
-  log('Arrancando Redis, MinIO y Mailpit...');
+  log('Arrancando Redis, almacenamiento y Mailpit...');
   mkdirSync(path.join(DATA, 'redis'), { recursive: true });
   run('redis', redis, ['--port', '6379', '--bind', '127.0.0.1', '--dir', path.join(DATA, 'redis'), '--appendonly', 'yes']);
-  run('minio', minio, ['server', path.join(DATA, 'minio'), '--address', '127.0.0.1:9000', '--console-address', '127.0.0.1:9001'], {
-    MINIO_ROOT_USER: 'minioadmin',
-    MINIO_ROOT_PASSWORD: 'minioadmin',
-    MINIO_API_CORS_ALLOW_ORIGIN: 'http://localhost:3000',
-  });
+  if (storage) {
+    const dir = path.join(DATA, 's3');
+    mkdirSync(dir, { recursive: true });
+    run('almacenamiento', storage, [
+      'server', `-dir=${dir}`, '-ip=127.0.0.1', '-ip.bind=127.0.0.1',
+      '-master.port=19333', '-volume.port=18080', '-filer.port=18888', '-master.volumeSizeLimitMB=1024',
+      '-s3', '-s3.port=9000',
+    ]);
+  }
   run('mailpit', mailpit, ['--smtp', '127.0.0.1:1025', '--listen', '127.0.0.1:8025']);
 
-  await Promise.all([waitPort(6379, 'Redis'), waitPort(9000, 'MinIO'), waitPort(1025, 'Mailpit')]);
+  await Promise.all([waitPort(6379, 'Redis'), waitPort(1025, 'Mailpit'), storage ? waitPort(9000, 'Almacenamiento S3', 90) : null]);
   writeFileSync(READY, new Date().toISOString());
 
   console.log('\n  Servicios listos:');
   console.log('    PostgreSQL  localhost:5432  (valorize / valorize, base de datos "valorize")');
   console.log('    Redis       localhost:6379');
-  console.log('    MinIO       localhost:9000   consola http://localhost:9001  (minioadmin / minioadmin)');
+  console.log(`    S3          ${storage ? 'localhost:9000' : 'no disponible (subida de documentos desactivada)'}`);
   console.log('    Correo      http://localhost:8025');
   console.log('\n  Deja esta ventana abierta. Ctrl+C para pararlo todo.\n');
 }
