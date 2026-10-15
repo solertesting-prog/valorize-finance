@@ -45,7 +45,9 @@ infra/      Docker Compose (desarrollo y producción), Caddy, backups, política
 
 ## Puesta en marcha (desarrollo)
 
-Requisitos: Node 22, pnpm 10 y Docker.
+**Windows sin Docker:** ejecuta `scripts\windows\valorize-arrancar.bat` (copiado en una carpeta cualquiera). Clona o actualiza el repo, descarga PostgreSQL, Redis, MinIO y Mailpit portátiles en `.local-services/` (`node infra/local-services.mjs`), prepara la base de datos y arranca API y web. Solo necesita Git y Node 22.
+
+Con Docker (macOS, Linux o Windows con WSL 2): Node 22, pnpm 10 y Docker.
 
 ```bash
 pnpm install                                        # genera pnpm-lock.yaml la primera vez

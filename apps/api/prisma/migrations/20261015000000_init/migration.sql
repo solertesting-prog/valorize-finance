@@ -1,5 +1,4 @@
 -- Generado a partir de prisma/schema.prisma
-CREATE EXTENSION IF NOT EXISTS "citext";
 
 CREATE TYPE "Role" AS ENUM ('CUSTOMER', 'EMPLOYEE', 'MANAGER', 'ADMIN');
 CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'SUSPENDED', 'DELETED');
@@ -19,7 +18,7 @@ CREATE TYPE "WebhookDeliveryStatus" AS ENUM ('PENDING', 'SUCCEEDED', 'FAILED');
 -- CreateTable
 CREATE TABLE "users" (
     "id" UUID NOT NULL,
-    "email" CITEXT NOT NULL,
+    "email" VARCHAR(254) NOT NULL,
     "phone" VARCHAR(20),
     "passwordHash" TEXT NOT NULL,
     "firstName" VARCHAR(80) NOT NULL,

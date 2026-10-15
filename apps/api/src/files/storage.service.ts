@@ -1,6 +1,14 @@
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ENV, Env } from '../config/env';
 
 /**
@@ -9,13 +17,29 @@ import { ENV, Env } from '../config/env';
  * Cifrado en reposo SSE-S3 (AES256) en cada objeto.
  */
 @Injectable()
-export class StorageService {
+export class StorageService implements OnModuleInit {
+  private readonly logger = new Logger(StorageService.name);
   private readonly client: S3Client;
   /** Cliente con el endpoint público, para firmar URLs que abrirá el navegador o la app. */
   private readonly publicClient: S3Client;
   readonly bucket: string;
 
-  constructor(@Inject(ENV) env: Env) {
+  /** En desarrollo crea el bucket si no existe (MinIO local). En producción se aprovisiona aparte. */
+  async onModuleInit() {
+    if (this.env.NODE_ENV === 'production') return;
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+    } catch {
+      try {
+        await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+        this.logger.log(`Bucket ${this.bucket} creado`);
+      } catch (e) {
+        this.logger.warn(`No se pudo comprobar el bucket ${this.bucket}: ${(e as Error).message}`);
+      }
+    }
+  }
+
+  constructor(@Inject(ENV) private readonly env: Env) {
     const base = {
       region: env.S3_REGION,
       forcePathStyle: env.S3_FORCE_PATH_STYLE,
