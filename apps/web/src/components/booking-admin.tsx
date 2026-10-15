@@ -1,12 +1,13 @@
 'use client';
 
 import type React from 'react';
-import { BookingDto, BookingEventDto, BOOKING_STATUS_LABEL, BOOKING_TRANSITIONS, errorMessage, formatDateLong, formatTime, fullName, todayIn } from '@valorize/shared';
+import { BookingDto, BookingEventDto, BOOKING_STATUS_LABEL, CHANNEL_LABEL, BOOKING_TRANSITIONS, errorMessage, formatDateLong, formatTime, fullName, todayIn } from '@valorize/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { SlotPicker } from './booking';
 import { ExchangeSummary } from './exchange';
+import { OpenScanViewer, TxCheckPanel } from './openscan';
 import { useTransition } from './staff';
 import { Alert, Button, ErrorBox, KycBadge, Modal, Spinner, StatusBadge, TextInput, useToast } from './ui';
 import { api } from '@/lib/api';
@@ -49,7 +50,7 @@ export function BookingAdminView({ id, basePath, apiBase }: { id: string; basePa
         <div>
           <h1 className="mono">{b.reference}</h1>
           <p className="muted" style={{ textTransform: 'capitalize' }}>
-            {formatDateLong(b.startsAt, tz)}, {formatTime(b.startsAt, tz)} · {b.location.name}
+            {formatDateLong(b.startsAt, tz)}, {formatTime(b.startsAt, tz)} · {b.location.name} · <span style={{ textTransform: 'none' }}>solicitada desde {CHANNEL_LABEL[b.channel]}</span>
           </p>
         </div>
         <StatusBadge status={b.status} />
@@ -100,7 +101,11 @@ export function BookingAdminView({ id, basePath, apiBase }: { id: string; basePa
                 ) : null}
               </div>
               <ExchangeSummary ex={b.exchange} staff />
+              <OpenScanViewer network={b.exchange.network} kind="address" value={b.exchange.wallet.address} />
               {['CHECKED_IN', 'IN_SERVICE', 'COMPLETED'].includes(b.status) ? <SettlementForm booking={b} /> : null}
+              <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+                <TxCheckPanel booking={b} />
+              </div>
             </section>
           ) : null}
 
@@ -235,7 +240,7 @@ function SettlementForm({ booking }: { booking: BookingDto }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['staff'] });
       qc.invalidateQueries({ queryKey: ['admin'] });
-      toast('Datos de la operación guardados');
+      toast(f.txHash && f.txHash !== ex.txHash ? 'Liquidación guardada. Transacción comprobada en la red.' : 'Datos de la operación guardados');
     },
   });
   return (
@@ -251,7 +256,8 @@ function SettlementForm({ booking }: { booking: BookingDto }) {
         className="input mono"
         value={f.txHash}
         onChange={(e) => setF({ ...f, txHash: e.target.value.trim() })}
-        hint={ex.direction === 'SELL_CRYPTO' ? 'Envío del cliente a la wallet de Valorize.' : 'Envío de Valorize a la wallet del cliente.'}
+        placeholder={ex.network === 'TRON' ? '64 caracteres hexadecimales' : '0x…'}
+        hint={`${ex.direction === 'SELL_CRYPTO' ? 'Envío del cliente a la wallet de Valorize.' : 'Envío de Valorize a la wallet del cliente.'} Al guardarlo se comprueba en la blockchain.`}
       />
       {m.error ? <Alert kind="error">{errorMessage(m.error)}</Alert> : null}
       <div>

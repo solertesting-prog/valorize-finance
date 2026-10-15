@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { BookingStatus, NotificationType, Prisma, Role } from '@prisma/client';
-import type { ApproveBookingInput, BookingDto, BookingEventDto, BookingQrDto, CreateBookingInput, ScanResultDto } from '@valorize/shared';
+import type { AdminExchangeQuery, ApproveBookingInput, BookingDto, BookingEventDto, BookingQrDto, CreateBookingInput, ScanResultDto } from '@valorize/shared';
 import { ACTIVE_BOOKING_STATUSES, BOOKING_TRANSITIONS, formatDateTime, WebhookEvent } from '@valorize/shared';
 import { DateTime } from 'luxon';
 import { AuditService } from '../common/audit.service';
@@ -14,6 +14,7 @@ import { AvailabilityService } from './availability.service';
 import { bookingInclude, BookingFull, BookingRules, toBookingDto } from './booking.mapper';
 import { ExchangeService } from './exchange.service';
 import { QrService } from './qr.service';
+import { TxVerificationService } from './tx-verification.service';
 
 export interface Actor {
   id: string;
@@ -41,6 +42,7 @@ export class BookingsService {
     private readonly notifications: NotificationsService,
     private readonly webhooks: WebhooksService,
     private readonly exchange: ExchangeService,
+    private readonly txVerification: TxVerificationService,
     @Inject(ENV) private readonly env: Env,
   ) {
     this.rules = { cancelCutoffMin: env.CANCEL_CUTOFF_MIN, maxReschedules: env.MAX_RESCHEDULES };
@@ -105,6 +107,7 @@ export class BookingsService {
             endsAt: slot.endsAt,
             notes: input.notes,
             status: initialStatus,
+            channel: meta.client === 'mobile' ? 'APP' : 'WEB',
             qrNonce: this.qr.newNonce(),
             events: {
               create: {
@@ -277,10 +280,17 @@ export class BookingsService {
     const b = await this.findAny(id);
     await this.assertStaffLocation(actor, b.locationId);
     if (!b.exchange) throw Errors.unprocessable('NOT_EXCHANGE', 'Esta cita no es una operación de cambio');
+    const txHash = input.txHash ? normalizeTxHash(b.exchange.network, input.txHash) : undefined;
+    const txChanged = !!txHash && txHash !== b.exchange.txHash;
+    if (txChanged) {
+      const reused = await this.prisma.exchangeRequest.findFirst({ where: { txHash, network: b.exchange.network, id: { not: b.exchange.id } }, include: { booking: true } });
+      if (reused) throw Errors.conflict('TX_ALREADY_USED', `Esta transacción ya está registrada en la operación ${reused.booking.reference}`);
+    }
     await this.prisma.exchangeRequest.update({
       where: { id: b.exchange.id },
       data: {
-        txHash: input.txHash || undefined,
+        txHash: txHash || undefined,
+        ...(txChanged ? { txCheckStatus: null, txCheck: Prisma.DbNull, txCheckedAt: null } : {}),
         agreedRate: input.agreedRate ?? undefined,
         fiatAmount: input.fiatAmount ?? undefined,
         feeAmount: input.feeAmount ?? undefined,
@@ -288,7 +298,50 @@ export class BookingsService {
       },
     });
     await this.audit.log({ actorId: actor.id, action: 'exchange.settlement_updated', entityType: 'booking', entityId: id, metadata: input, meta });
+    // Verificación on-chain inmediata del nuevo hash. Si la red no responde, queda como ERROR y el job la reintenta.
+    if (txChanged) await this.txVerification.verify(b.exchange.id, actor.id).catch(() => undefined);
     return this.dto(await this.findAny(id), true);
+  }
+
+  /** Vuelve a comprobar en la blockchain la transacción de una operación. */
+  async verifyExchangeTx(actor: Actor, id: string) {
+    const b = await this.findAny(id);
+    await this.assertStaffLocation(actor, b.locationId);
+    if (!b.exchange) throw Errors.unprocessable('NOT_EXCHANGE', 'Esta cita no es una operación de cambio');
+    await this.txVerification.verify(b.exchange.id, actor.id);
+    return this.dto(await this.findAny(id), true);
+  }
+
+  /** Todas las operaciones de cambio, con su wallet y la verificación de la transacción. */
+  async adminExchanges(q: AdminExchangeQuery) {
+    const where: Prisma.BookingWhereInput = {
+      exchange: {
+        is: {
+          ...(q.network ? { network: q.network } : {}),
+          ...(q.riskStatus ? { wallet: { riskStatus: q.riskStatus } } : {}),
+          ...(q.txStatus === 'NONE' ? { txCheckStatus: null } : q.txStatus ? { txCheckStatus: q.txStatus } : {}),
+        },
+      },
+      ...(q.status ? { status: q.status } : {}),
+      ...(q.channel ? { channel: q.channel } : {}),
+      ...(q.locationId ? { locationId: q.locationId } : {}),
+      ...(q.q
+        ? {
+            OR: [
+              { reference: { contains: q.q, mode: 'insensitive' } },
+              { user: { email: { contains: q.q, mode: 'insensitive' } } },
+              { user: { lastName: { contains: q.q, mode: 'insensitive' } } },
+              { exchange: { is: { wallet: { address: { contains: q.q.toLowerCase().startsWith('0x') ? q.q.toLowerCase() : q.q } } } } },
+              { exchange: { is: { txHash: { contains: q.q.replace(/^0x/i, '').toLowerCase() } } } },
+            ],
+          }
+        : {}),
+    };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.booking.findMany({ where, include: bookingInclude, orderBy: { createdAt: 'desc' }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
+      this.prisma.booking.count({ where }),
+    ]);
+    return { items: items.map((b) => this.dto(b, true)), total, page: q.page, pageSize: q.pageSize };
   }
 
   async listForUser(userId: string, scope: 'upcoming' | 'past' | 'all', page: number, pageSize: number) {
@@ -708,4 +761,10 @@ function webhookPayload(b: BookingFull) {
     startsAt: b.startsAt.toISOString(),
     endsAt: b.endsAt.toISOString(),
   };
+}
+
+/** Hash en forma canónica: EVM con 0x y en minúsculas; TRON sin 0x y en minúsculas. */
+function normalizeTxHash(network: string, hash: string) {
+  const h = hash.trim().replace(/^0x/i, '').toLowerCase();
+  return network === 'TRON' ? h : `0x${h}`;
 }

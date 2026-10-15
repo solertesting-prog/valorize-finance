@@ -1,5 +1,5 @@
 import { Prisma, WalletRiskStatus } from '@prisma/client';
-import type { BookingDto, ExchangeDto } from '@valorize/shared';
+import type { BookingDto, ExchangeDto, TxCheckDto } from '@valorize/shared';
 import { parseAddress } from '../wallets/address';
 
 export const bookingInclude = {
@@ -50,6 +50,7 @@ function exchangeDto(e: NonNullable<BookingFull['exchange']>, staff: boolean): E
     feeAmount: e.feeAmount?.toString() ?? null,
     txHash: e.txHash,
     internalNote: staff ? e.internalNote : undefined,
+    txCheck: staff ? ((e.txCheck as unknown as TxCheckDto | null) ?? null) : undefined,
   };
 }
 
@@ -60,6 +61,7 @@ export function toBookingDto(b: BookingFull, rules: BookingRules, opts: { includ
     id: b.id,
     reference: b.reference,
     status: b.status,
+    channel: b.channel,
     startsAt: b.startsAt.toISOString(),
     endsAt: b.endsAt.toISOString(),
     notes: b.notes,

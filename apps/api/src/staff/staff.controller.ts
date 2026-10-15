@@ -93,6 +93,12 @@ export class StaffController {
     return this.bookings.updateExchangeSettlement(u, id, b, meta);
   }
 
+  /** Vuelve a comprobar en la blockchain la transacción registrada. */
+  @Post('bookings/:id/exchange/verify-tx')
+  verifyTx(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.bookings.verifyExchangeTx(u, id);
+  }
+
   @Get('incidents')
   incidents(@CurrentUser() u: AuthUser, @Query(new ZodPipe(incidentQuery)) q: z.infer<typeof incidentQuery>) {
     return this.staff.incidents(u, { locationId: q.locationId, status: q.status }, q.page, q.pageSize);

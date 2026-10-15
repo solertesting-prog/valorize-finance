@@ -37,7 +37,7 @@ async function bootstrap() {
     origin: origins.length ? origins : false,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id', 'X-Client'],
     maxAge: 600,
   });
 

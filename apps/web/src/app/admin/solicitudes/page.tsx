@@ -4,6 +4,7 @@ import type React from 'react';
 import {
   ApiError,
   BookingDto,
+  CHANNEL_LABEL,
   errorMessage,
   formatDateLong,
   formatTime,
@@ -16,6 +17,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ExchangeSummary, ScreeningChecks, ScreeningHeader } from '@/components/exchange';
+import { OpenScanViewer } from '@/components/openscan';
 import { Alert, Button, Empty, ErrorBox, KycBadge, Modal, Spinner, TextArea, TextInput, useToast } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -62,7 +64,9 @@ export default function Approvals() {
                     <Link href={`/admin/citas/${b.id}`} className="mono" style={{ fontWeight: 700, fontSize: 'var(--t-lg)', color: 'var(--mint)' }}>
                       {b.reference}
                     </Link>
-                    <span className="xs muted">solicitada {relativeTime(b.createdAt)}</span>
+                    <span className="xs muted">
+                      solicitada {relativeTime(b.createdAt)} desde {CHANNEL_LABEL[b.channel]}
+                    </span>
                   </div>
                   <div className="small" style={{ textTransform: 'capitalize', marginTop: 4 }}>
                     {formatDateLong(b.startsAt, tz)}, <span className="mono">{formatTime(b.startsAt, tz)}</span> · {b.location.name}
@@ -111,6 +115,7 @@ export default function Approvals() {
                   <Alert kind="warn">La wallet aún no tiene auditoría.</Alert>
                 ) : null}
               </div>
+              {b.exchange ? <OpenScanViewer network={b.exchange.network} kind="address" value={b.exchange.wallet.address} title="Revisar la wallet en OpenScan" /> : null}
             </article>
           );
         })}

@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ChainNetwork, CryptoWallet, Prisma, WalletRiskStatus } from '@prisma/client';
 import type { AdminWalletDetailDto, AdminWalletDto, ExchangeSettingsDto, ExchangeSettingsInput, WalletDto } from '@valorize/shared';
 import { AuditService } from '../common/audit.service';
+import { ENV, Env } from '../config/env';
 import { RequestMeta } from '../common/auth.decorators';
 import { Errors } from '../common/errors';
 import { PrismaService } from '../common/prisma.service';
@@ -23,6 +24,7 @@ export class WalletsService {
     private readonly prisma: PrismaService,
     private readonly screening: WalletScreeningService,
     private readonly audit: AuditService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   // ─────────── Cliente ───────────
@@ -173,6 +175,8 @@ export class WalletsService {
         asset: e.asset,
         amount: e.amount.toString(),
         startsAt: e.booking.startsAt.toISOString(),
+        txHash: e.txHash,
+        txCheckStatus: e.txCheckStatus,
       })),
     };
   }
@@ -260,7 +264,13 @@ export class WalletsService {
 
   // ─────────── Ajustes ───────────
 
-  async settings(): Promise<ExchangeSettingsDto> {
+  /** Direcciones propias de Valorize por red, en forma canónica (EVM en minúsculas). */
+  async receivingAddresses(): Promise<Partial<Record<ChainNetwork, string[]>>> {
+    const s = await this.prisma.exchangeSettings.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
+    return normalizeReceiving(s.receivingAddresses);
+  }
+
+  async settings(admin = false): Promise<ExchangeSettingsDto> {
     const s = await this.prisma.exchangeSettings.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
     return {
       enabledAssets: s.enabledAssets,
@@ -273,6 +283,8 @@ export class WalletsService {
       monthlyLimitPerUser: s.monthlyLimitPerUser.toString(),
       enhancedKycAbove: s.enhancedKycAbove.toString(),
       minWalletAgeDays: s.minWalletAgeDays,
+      openscanUrl: this.env.OPENSCAN_URL,
+      ...(admin ? { receivingAddresses: normalizeReceiving(s.receivingAddresses, true) } : {}),
     };
   }
 
@@ -281,8 +293,29 @@ export class WalletsService {
     if (Number(input.monthlyLimitPerUser) < Number(input.dailyLimitPerUser)) {
       throw Errors.unprocessable('INVALID_LIMITS', 'El límite mensual no puede ser menor que el diario');
     }
-    await this.prisma.exchangeSettings.upsert({ where: { id: 1 }, create: { id: 1, ...input }, update: input });
+    const receiving: Partial<Record<ChainNetwork, string[]>> = {};
+    for (const [n, list] of Object.entries(input.receivingAddresses ?? {}) as [ChainNetwork, string[] | undefined][]) {
+      const parsed = (list ?? []).filter(Boolean).map((a) => parseAddress(n, a));
+      const bad = parsed.find((p) => !p.valid);
+      if (bad) throw Errors.unprocessable('INVALID_ADDRESS', `${bad.display}: ${bad.error}`);
+      if (parsed.length) receiving[n] = [...new Set(parsed.map((p) => p.display))];
+    }
+    const data = { ...input, receivingAddresses: receiving as Prisma.InputJsonValue };
+    await this.prisma.exchangeSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
     await this.audit.log({ actorId, action: 'exchange.settings_updated', entityType: 'exchange_settings', entityId: '1', metadata: input, meta });
-    return this.settings();
+    return this.settings(true);
   }
+}
+
+/** Lee el JSON de direcciones propias. display=true devuelve el formato para mostrar (EIP-55). */
+function normalizeReceiving(v: Prisma.JsonValue, display = false): Partial<Record<ChainNetwork, string[]>> {
+  const out: Partial<Record<ChainNetwork, string[]>> = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const n of Object.values(ChainNetwork)) {
+    const list = (v as Record<string, unknown>)[n];
+    if (!Array.isArray(list)) continue;
+    const parsed = list.filter((a): a is string => typeof a === 'string').map((a) => parseAddress(n, a)).filter((p) => p.valid);
+    if (parsed.length) out[n] = parsed.map((p) => (display ? p.display : p.canonical));
+  }
+  return out;
 }

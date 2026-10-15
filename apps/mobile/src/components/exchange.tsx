@@ -6,7 +6,7 @@ import {
   ExchangeDirection,
   ExchangeDto,
   ExchangeSettingsDto,
-  EXPLORER_TX_URL,
+  explorerLinks,
   NETWORK_LABEL,
   walletAddressShape,
   WalletDto,
@@ -185,6 +185,8 @@ function Item({ label, value, mono, wide }: { label: string; value: string; mono
 
 /** Resumen de la operación para el cliente (nunca muestra el resultado de la auditoría). */
 export function ExchangeSummary({ ex }: { ex: ExchangeDto }) {
+  const openscan = useExchangeSettings().data?.openscanUrl;
+  const tx = ex.txHash ? explorerLinks(ex.network, 'tx', ex.txHash, openscan) : null;
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
       <Item label="Operación" value={DIRECTION_SHORT[ex.direction]} />
@@ -193,8 +195,8 @@ export function ExchangeSummary({ ex }: { ex: ExchangeDto }) {
       {ex.fiatAmount ? <Item label="Importe en euros" value={`${ex.fiatAmount} €${ex.agreedRate ? ` (a ${ex.agreedRate})` : ''}`} /> : null}
       <Item label={`Wallet${ex.wallet.label ? ` · ${ex.wallet.label}` : ''}`} value={ex.wallet.address} mono wide />
       {ex.txHash ? (
-        <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${EXPLORER_TX_URL[ex.network]}${ex.txHash}`)} style={{ width: '100%', paddingVertical: 6 }}>
-          <Text style={{ color: c.fog, fontFamily: f.ui, fontSize: t.xs }}>Transacción</Text>
+        <Pressable accessibilityRole="link" onPress={() => tx && Linking.openURL(tx.openscan ?? tx.native)} style={{ width: '100%', paddingVertical: 6 }}>
+          <Text style={{ color: c.fog, fontFamily: f.ui, fontSize: t.xs }}>Transacción · ver en {tx?.openscan ? 'OpenScan' : tx?.nativeName}</Text>
           <Text style={{ color: c.mint, fontFamily: f.brand, fontSize: t.sm }}>{shortAddress(ex.txHash)}</Text>
         </Pressable>
       ) : null}

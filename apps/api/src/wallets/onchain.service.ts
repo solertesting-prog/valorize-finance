@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { ChainNetwork, CryptoAsset } from '@prisma/client';
 import { ENV, Env } from '../config/env';
-import { parseAddress } from './address';
+import { parseAddress, tronFromHex } from './address';
 import { DEFAULT_RPC, DEFAULT_TRONGRID, EVM_CHAIN_ID, formatUnits, TOKENS } from './chains';
 
 const TIMEOUT = 8000;
@@ -19,6 +19,31 @@ export interface OnchainSnapshot {
   isContract?: boolean;
   /** La cuenta existe en la red (TRON: activada). */
   exists?: boolean;
+}
+
+/** Evento Transfer(address,address,uint256) de ERC-20 / TRC-20. */
+const TRANSFER_TOPIC = 'ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+
+export interface TokenTransfer {
+  /** Contrato del token: EVM 0x… en minúsculas, TRON base58. */
+  token: string;
+  from: string;
+  to: string;
+  raw: bigint;
+}
+
+export interface TxLookup {
+  state: 'not_found' | 'pending' | 'failed' | 'success';
+  blockNumber?: number;
+  timestamp?: string;
+  confirmations?: number;
+  transfers: TokenTransfer[];
+}
+
+interface EvmLog {
+  address: string;
+  topics: string[];
+  data: string;
 }
 
 /**
@@ -126,6 +151,69 @@ export class OnchainService {
     };
     snap.firstSeenAt = await this.evmFirstSeen(network, parsed.canonical).catch(() => undefined);
     return snap;
+  }
+
+  /** Busca una transacción y extrae las transferencias de tokens que contiene. */
+  async lookupTx(network: ChainNetwork, hash: string): Promise<TxLookup> {
+    const h = hash.trim().replace(/^0x/i, '').toLowerCase();
+    if (network === 'TRON') {
+      const info = await this.tron<{
+        id?: string;
+        blockNumber?: number;
+        blockTimeStamp?: number;
+        result?: string;
+        receipt?: { result?: string };
+        log?: { address: string; topics?: string[]; data?: string }[];
+      }>('/wallet/gettransactioninfobyid', { value: h });
+      if (!info.id) {
+        const tx = await this.tron<{ txID?: string }>('/wallet/gettransactionbyid', { value: h });
+        return { state: tx.txID ? 'pending' : 'not_found', transfers: [] };
+      }
+      const now = await this.tron<{ block_header?: { raw_data?: { number?: number } } }>('/wallet/getnowblock');
+      const head = now.block_header?.raw_data?.number;
+      const failed = info.result === 'FAILED' || (info.receipt?.result != null && info.receipt.result !== 'SUCCESS');
+      const transfers: TokenTransfer[] = (info.log ?? [])
+        .filter((l) => l.topics?.length === 3 && l.topics[0].replace(/^0x/, '') === TRANSFER_TOPIC)
+        .map((l) => ({
+          token: tronFromHex(l.address),
+          from: tronFromHex(l.topics![1].slice(-40)),
+          to: tronFromHex(l.topics![2].slice(-40)),
+          raw: BigInt(`0x${(l.data || '0').replace(/^0x/, '') || '0'}`),
+        }));
+      return {
+        state: failed ? 'failed' : 'success',
+        blockNumber: info.blockNumber,
+        timestamp: info.blockTimeStamp ? new Date(info.blockTimeStamp).toISOString() : undefined,
+        confirmations: head != null && info.blockNumber != null ? Math.max(0, head - info.blockNumber + 1) : undefined,
+        transfers,
+      };
+    }
+    const txHash = `0x${h}`;
+    const receipt = await this.rpc<{ status?: string; blockNumber?: string; logs?: EvmLog[] } | null>(network, 'eth_getTransactionReceipt', [txHash]);
+    if (!receipt) {
+      const tx = await this.rpc<unknown>(network, 'eth_getTransactionByHash', [txHash]);
+      return { state: tx ? 'pending' : 'not_found', transfers: [] };
+    }
+    const blockNumber = receipt.blockNumber ? Number(BigInt(receipt.blockNumber)) : undefined;
+    const [headHex, block] = await Promise.all([
+      this.rpc<string>(network, 'eth_blockNumber', []),
+      receipt.blockNumber ? this.rpc<{ timestamp?: string } | null>(network, 'eth_getBlockByNumber', [receipt.blockNumber, false]) : Promise.resolve(null),
+    ]);
+    const transfers: TokenTransfer[] = (receipt.logs ?? [])
+      .filter((l) => l.topics.length === 3 && l.topics[0].replace(/^0x/, '').toLowerCase() === TRANSFER_TOPIC)
+      .map((l) => ({
+        token: l.address.toLowerCase(),
+        from: `0x${l.topics[1].slice(-40).toLowerCase()}`,
+        to: `0x${l.topics[2].slice(-40).toLowerCase()}`,
+        raw: BigInt(l.data && l.data !== '0x' ? l.data : '0x0'),
+      }));
+    return {
+      state: receipt.status === '0x1' ? 'success' : 'failed',
+      blockNumber,
+      timestamp: block?.timestamp ? new Date(Number(BigInt(block.timestamp)) * 1000).toISOString() : undefined,
+      confirmations: blockNumber != null ? Math.max(0, Number(BigInt(headHex)) - blockNumber + 1) : undefined,
+      transfers,
+    };
   }
 
   /** Primera transacción conocida (Etherscan v2, multicadena). undefined si no hay API key. */

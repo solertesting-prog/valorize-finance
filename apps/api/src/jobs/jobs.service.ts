@@ -8,6 +8,7 @@ import { BookingsService } from '../bookings/bookings.service';
 import { KycService } from '../kyc/kyc.service';
 import { StorageService } from '../files/storage.service';
 import { WalletsService } from '../wallets/wallets.service';
+import { TxVerificationService } from '../bookings/tx-verification.service';
 
 /**
  * Tareas periódicas. Con varias réplicas de la API, un lock en Redis garantiza
@@ -23,6 +24,7 @@ export class JobsService implements OnApplicationBootstrap {
     private readonly kyc: KycService,
     private readonly storage: StorageService,
     private readonly wallets: WalletsService,
+    private readonly txVerification: TxVerificationService,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(ENV) private readonly env: Env,
   ) {}
@@ -71,6 +73,12 @@ export class JobsService implements OnApplicationBootstrap {
   }
 
   /** Lista OFAC de direcciones sancionadas: al arrancar si está vacía y cada día. */
+  /** Las transacciones a la espera de confirmaciones se vuelven a comprobar cada 10 minutos. */
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  txRecheck() {
+    return this.exclusive('tx-recheck', 540, () => this.txVerification.recheckPending());
+  }
+
   @Cron(CronExpression.EVERY_DAY_AT_4AM, { timeZone: 'Europe/Madrid' })
   ofac() {
     return this.exclusive('ofac', 600, () => this.wallets.syncOfac());

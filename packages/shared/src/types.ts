@@ -1,4 +1,6 @@
 import type {
+  BookingChannel,
+  TxCheckStatus,
   BookingStatus,
   ChainNetwork,
   CryptoAsset,
@@ -132,6 +134,8 @@ export interface BookingDto {
   id: string;
   reference: string;
   status: BookingStatus;
+  /** Desde dónde se creó: web, app o backoffice. */
+  channel: BookingChannel;
   startsAt: string;
   endsAt: string;
   notes: string | null;
@@ -341,6 +345,23 @@ export interface ExchangeDto {
   txHash: string | null;
   /** Solo visible para personal. */
   internalNote?: string | null;
+  /** Verificación on-chain de la transacción. Solo visible para personal. */
+  txCheck?: TxCheckDto | null;
+}
+
+/** Resultado de comprobar en la blockchain la transacción de una operación. */
+export interface TxCheckDto {
+  status: TxCheckStatus;
+  checkedAt: string;
+  txHash: string;
+  blockNumber: number | null;
+  /** Fecha del bloque (ISO). */
+  timestamp: string | null;
+  confirmations: number | null;
+  requiredConfirmations: number;
+  /** Transferencia del token que se ha casado con la operación. */
+  transfer: { from: string; to: string; amount: string; token: string } | null;
+  checks: ScreeningCheckDto[];
 }
 
 export type CheckResult = 'pass' | 'warn' | 'fail' | 'error' | 'skip';
@@ -376,7 +397,17 @@ export interface AdminWalletDto extends WalletDto {
 export interface AdminWalletDetailDto {
   wallet: AdminWalletDto;
   screenings: WalletScreeningDto[];
-  exchanges: { bookingId: string; reference: string; status: BookingStatus; direction: ExchangeDirection; asset: CryptoAsset; amount: string; startsAt: string }[];
+  exchanges: {
+    bookingId: string;
+    reference: string;
+    status: BookingStatus;
+    direction: ExchangeDirection;
+    asset: CryptoAsset;
+    amount: string;
+    startsAt: string;
+    txHash: string | null;
+    txCheckStatus: TxCheckStatus | null;
+  }[];
 }
 
 export interface ExchangeSettingsDto {
@@ -390,6 +421,10 @@ export interface ExchangeSettingsDto {
   monthlyLimitPerUser: string;
   enhancedKycAbove: string;
   minWalletAgeDays: number;
+  /** Instancia de OpenScan para revisar wallets y transacciones. */
+  openscanUrl: string;
+  /** Direcciones propias de Valorize por red (solo backoffice). */
+  receivingAddresses?: Partial<Record<ChainNetwork, string[]>>;
 }
 
 export interface PendingApprovalDto {

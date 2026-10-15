@@ -121,7 +121,7 @@ export class AdminWalletsController {
 
   @Get('exchange-settings')
   settings() {
-    return this.wallets.settings();
+    return this.wallets.settings(true);
   }
 
   @Roles('ADMIN')

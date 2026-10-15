@@ -8,8 +8,7 @@ import {
   ExchangeDirection,
   ExchangeDto,
   ExchangeSettingsDto,
-  EXPLORER_ADDRESS_URL,
-  EXPLORER_TX_URL,
+  explorerLinks,
   NETWORK_LABEL,
   ScreeningCheckDto,
   WALLET_RISK_LABEL,
@@ -209,6 +208,9 @@ export function shortAddress(a: string) {
 }
 
 export function ExchangeSummary({ ex, staff = false }: { ex: ExchangeDto; staff?: boolean }) {
+  const openscan = useExchangeSettings().data?.openscanUrl;
+  const addr = explorerLinks(ex.network, 'address', ex.wallet.address, openscan);
+  const tx = ex.txHash ? explorerLinks(ex.network, 'tx', ex.txHash, openscan) : null;
   return (
     <dl className="grid" style={{ '--min': '150px', margin: 0, gap: 12 } as CSSProperties}>
       <div>
@@ -237,7 +239,7 @@ export function ExchangeSummary({ ex, staff = false }: { ex: ExchangeDto; staff?
         <dt className="xs muted">Wallet{ex.wallet.label ? ` · ${ex.wallet.label}` : ''}</dt>
         <dd className="row" style={{ margin: 0, gap: 8 }}>
           {staff ? (
-            <a className="mono small" href={`${EXPLORER_ADDRESS_URL[ex.network]}${ex.wallet.address}`} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>
+            <a className="mono small" href={addr.openscan ?? addr.native} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>
               {ex.wallet.address}
             </a>
           ) : (
@@ -252,7 +254,7 @@ export function ExchangeSummary({ ex, staff = false }: { ex: ExchangeDto; staff?
         <div style={{ gridColumn: '1 / -1' }}>
           <dt className="xs muted">Transacción</dt>
           <dd style={{ margin: 0 }}>
-            <a className="mono small" href={`${EXPLORER_TX_URL[ex.network]}${ex.txHash}`} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>
+            <a className="mono small" href={tx ? (tx.openscan ?? tx.native) : undefined} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>
               {ex.txHash}
             </a>
           </dd>
@@ -278,11 +280,11 @@ const CHECK_ICON: Record<ScreeningCheckDto['result'], [string, string]> = {
   skip: ['–', 'var(--fog)'],
 };
 
-/** Lista de comprobaciones de una auditoría de wallet. */
-export function ScreeningChecks({ screening }: { screening: WalletScreeningDto }) {
+/** Lista de comprobaciones (auditoría de wallet o verificación de transacción). */
+export function CheckList({ checks }: { checks: ScreeningCheckDto[] }) {
   return (
     <ul className="stack" style={{ listStyle: 'none', padding: 0, margin: 0, '--gap': '6px' } as CSSProperties}>
-      {screening.checks.map((c, i) => {
+      {checks.map((c, i) => {
         const [icon, color] = CHECK_ICON[c.result];
         return (
           <li key={`${c.code}-${i}`} className="row" style={{ alignItems: 'flex-start', gap: 10, flexWrap: 'nowrap' }}>
@@ -296,13 +298,20 @@ export function ScreeningChecks({ screening }: { screening: WalletScreeningDto }
               <div className="small" style={{ fontWeight: 600 }}>
                 {c.label}
               </div>
-              <div className="xs muted">{c.detail}</div>
+              <div className="xs muted" style={{ overflowWrap: 'anywhere' }}>
+                {c.detail}
+              </div>
             </div>
           </li>
         );
       })}
     </ul>
   );
+}
+
+/** Lista de comprobaciones de una auditoría de wallet. */
+export function ScreeningChecks({ screening }: { screening: WalletScreeningDto }) {
+  return <CheckList checks={screening.checks} />;
 }
 
 export function ScreeningHeader({ screening }: { screening: WalletScreeningDto }) {

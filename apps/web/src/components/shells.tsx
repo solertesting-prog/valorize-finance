@@ -93,6 +93,7 @@ const STAFF_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { href: '/admin', label: 'Analítica', icon: 'chart', exact: true },
   { href: '/admin/solicitudes', label: 'Solicitudes', icon: 'inbox' },
+  { href: '/admin/operaciones', label: 'Operaciones', icon: 'list' },
   { href: '/admin/citas', label: 'Citas', icon: 'calendar' },
   { href: '/admin/wallets', label: 'Wallets', icon: 'wallet' },
   { href: '/admin/clientes', label: 'Clientes', icon: 'users' },

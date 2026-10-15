@@ -6,7 +6,6 @@ import {
   BOOKING_STATUS_LABEL,
   DIRECTION_SHORT,
   errorMessage,
-  EXPLORER_ADDRESS_URL,
   NETWORK_LABEL,
   WalletScreeningDto,
 } from '@valorize/shared';
@@ -15,6 +14,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { ScreeningChecks, ScreeningHeader, WalletRiskBadge } from '@/components/exchange';
+import { ExplorerButtons, OpenScanViewer, TxCheckBadge } from '@/components/openscan';
 import { Alert, Button, ErrorBox, Modal, Spinner, TextArea, useToast } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -66,10 +66,12 @@ export default function WalletDetail() {
         </div>
         <div className="row">
           <WalletRiskBadge status={w.riskStatus} score={w.riskScore} />
-          <a className="btn sm" href={`${EXPLORER_ADDRESS_URL[w.network]}${w.address}`} target="_blank" rel="noreferrer">
-            Abrir en el explorador
-          </a>
+          <ExplorerButtons network={w.network} kind="address" value={w.address} />
         </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <OpenScanViewer network={w.network} kind="address" value={w.address} title="Actividad de la wallet en OpenScan" />
       </div>
 
       {w.sharedWithOtherCustomers ? (
@@ -122,6 +124,12 @@ export default function WalletDetail() {
                       {DIRECTION_SHORT[e.direction]} {e.amount} {e.asset}
                     </span>
                     <span className="muted">{BOOKING_STATUS_LABEL[e.status]}</span>
+                    {e.txHash ? (
+                      <span className="row" style={{ gap: 6 }}>
+                        <TxCheckBadge status={e.txCheckStatus} />
+                        <ExplorerButtons network={w.network} kind="tx" value={e.txHash} />
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>

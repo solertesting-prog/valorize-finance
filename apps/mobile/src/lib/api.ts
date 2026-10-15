@@ -62,6 +62,8 @@ export const api = createApiClient({
   getAccessToken: () => accessToken,
   refresh: async () => (await refreshSession())?.accessToken ?? null,
   onUnauthorized: () => void clearSession(),
+  // Identifica las peticiones de la app (las citas creadas desde aquí quedan con canal "App").
+  headers: { 'X-Client': 'mobile' },
 });
 
 export async function getRefreshToken() {

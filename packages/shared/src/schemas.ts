@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  BookingChannel,
   BookingStatus,
   ChainNetwork,
   CryptoAsset,
@@ -11,6 +12,7 @@ import {
   KycFieldType,
   KycStatus,
   Role,
+  TxCheckStatus,
   UserStatus,
   VerificationChannel,
   WEBHOOK_EVENTS,
@@ -388,6 +390,22 @@ export const exchangeSettingsSchema = z.object({
   monthlyLimitPerUser: amountString,
   enhancedKycAbove: amountString,
   minWalletAgeDays: z.number().int().min(0).max(3650),
+  /** Direcciones propias de Valorize por red: se usan para comprobar la contraparte de cada transacción. */
+  receivingAddresses: z
+    .object({
+      TRON: z.array(z.string().trim()).max(20).optional(),
+      ETHEREUM: z.array(z.string().trim()).max(20).optional(),
+      POLYGON: z.array(z.string().trim()).max(20).optional(),
+      BSC: z.array(z.string().trim()).max(20).optional(),
+    })
+    .superRefine((r, ctx) => {
+      for (const n of values(ChainNetwork)) {
+        (r[n] ?? []).forEach((a, i) => {
+          if (!walletAddressShape[n].test(a)) ctx.addIssue({ code: 'custom', path: [n, i], message: `Dirección no válida para ${n}: ${a}` });
+        });
+      }
+    })
+    .default({}),
 });
 export type ExchangeSettingsInput = z.infer<typeof exchangeSettingsSchema>;
 
@@ -396,10 +414,26 @@ export const walletListQuerySchema = paginationSchema.extend({
   network: z.enum(values(ChainNetwork)).optional(),
 });
 
+/** Hash de transacción: EVM 0x + 64 hex; TRON 64 hex. */
+export const txHashSchema = z
+  .string()
+  .trim()
+  .regex(/^(0x)?[0-9a-fA-F]{64}$/, 'El hash de la transacción tiene 64 caracteres hexadecimales');
+
 export const completeExchangeSchema = z.object({
-  txHash: z.string().trim().max(100).optional(),
+  txHash: z.union([txHashSchema, z.literal('')]).optional(),
   agreedRate: optionalDecimal,
   fiatAmount: optionalDecimal,
   feeAmount: optionalDecimal,
   note: z.string().trim().max(300).optional(),
 });
+
+export const adminExchangeQuerySchema = paginationSchema.extend({
+  status: z.enum(values(BookingStatus)).optional(),
+  network: z.enum(values(ChainNetwork)).optional(),
+  riskStatus: z.enum(values(WalletRiskStatus)).optional(),
+  txStatus: z.union([z.enum(values(TxCheckStatus)), z.literal('NONE')]).optional(),
+  channel: z.enum(values(BookingChannel)).optional(),
+  locationId: z.string().uuid().optional(),
+});
+export type AdminExchangeQuery = z.infer<typeof adminExchangeQuerySchema>;

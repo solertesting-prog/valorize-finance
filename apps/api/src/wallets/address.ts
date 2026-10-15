@@ -77,7 +77,8 @@ export function parseAddress(network: ChainNetwork, address: string): ParsedAddr
 
 /** Codifica 20 bytes hex como dirección TRON base58 (para respuestas de TronGrid en hex). */
 export function tronFromHex(hex: string): string {
-  const h = hex.replace(/^0x/, '').replace(/^41/, '');
+  let h = hex.replace(/^0x/, '');
+  if (h.length === 42 && h.startsWith('41')) h = h.slice(2);
   const payload = Buffer.from(`41${h.padStart(40, '0')}`, 'hex');
   const check = sha256(sha256(payload)).subarray(0, 4);
   let n = BigInt(`0x${Buffer.concat([payload, check]).toString('hex')}`);

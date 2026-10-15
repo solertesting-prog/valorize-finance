@@ -4,7 +4,7 @@ import type React from 'react';
 import { ChainNetwork, CryptoAsset, errorMessage, ExchangeSettingsDto, NETWORK_LABEL } from '@valorize/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useState } from 'react';
-import { Alert, Button, ErrorBox, Spinner, TextInput, useToast } from '@/components/ui';
+import { Alert, Button, ErrorBox, Spinner, TextArea, TextInput, useToast } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -15,11 +15,26 @@ export default function ExchangeSettingsPage() {
   const toast = useToast();
   const q = useQuery({ queryKey: ['admin', 'exchange-settings'], queryFn: () => api.get<ExchangeSettingsDto>('/admin/exchange-settings') });
   const [f, setF] = useState<ExchangeSettingsDto | null>(null);
+  const [addr, setAddr] = useState<Partial<Record<ChainNetwork, string>>>({});
   useEffect(() => {
-    if (q.data) setF(q.data);
+    if (!q.data) return;
+    setF(q.data);
+    setAddr(Object.fromEntries(Object.entries(q.data.receivingAddresses ?? {}).map(([n, l]) => [n, (l ?? []).join('\n')])));
   }, [q.data]);
   const save = useMutation({
-    mutationFn: () => api.put<ExchangeSettingsDto>('/admin/exchange-settings', f),
+    mutationFn: () =>
+      api.put<ExchangeSettingsDto>('/admin/exchange-settings', {
+        ...f,
+        receivingAddresses: Object.fromEntries(
+          Object.entries(addr).map(([n, text]) => [
+            n,
+            (text ?? '')
+              .split(/[\s,;]+/)
+              .map((a) => a.trim())
+              .filter(Boolean),
+          ]),
+        ),
+      }),
     onSuccess: (d) => {
       qc.setQueryData(['admin', 'exchange-settings'], d);
       qc.invalidateQueries({ queryKey: ['exchange-settings'] });
@@ -103,6 +118,32 @@ export default function ExchangeSettingsPage() {
               hint="Más nueva genera un aviso en la auditoría."
             />
           </div>
+        </fieldset>
+
+        <fieldset className="card stack" disabled={readOnly} style={{ margin: 0 }}>
+          <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Direcciones de Valorize</h2>
+          <p className="small muted" style={{ margin: 0 }}>
+            Las wallets de la empresa en cada red, una por línea. Al verificar cada transacción comprobamos que el cliente envía a una de ellas (venta) o
+            que los fondos salen de una de ellas (compra).
+          </p>
+          <div className="grid" style={{ '--min': '260px' } as React.CSSProperties}>
+            {f.enabledNetworks.map((n) => (
+              <TextArea
+                key={n}
+                label={NETWORK_LABEL[n]}
+                className="textarea mono"
+                rows={3}
+                spellCheck={false}
+                placeholder={n === 'TRON' ? 'T…' : '0x…'}
+                value={addr[n] ?? ''}
+                onChange={(e) => setAddr({ ...addr, [n]: e.target.value })}
+              />
+            ))}
+          </div>
+          <p className="xs muted" style={{ margin: 0 }}>
+            Revisión de wallets y transacciones con OpenScan: <a href={f.openscanUrl} target="_blank" rel="noreferrer">{f.openscanUrl}</a> (se cambia con OPENSCAN_URL en el
+            servidor).
+          </p>
         </fieldset>
 
         {save.error ? <Alert kind="error">{errorMessage(save.error)}</Alert> : null}

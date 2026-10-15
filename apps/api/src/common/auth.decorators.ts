@@ -12,6 +12,8 @@ export interface RequestMeta {
   ip: string | null;
   userAgent: string | null;
   requestId: string | null;
+  /** Cliente que hace la petición (cabecera X-Client): la app móvil envía "mobile". */
+  client?: 'web' | 'mobile';
 }
 
 export type AppRequest = Request & { user?: AuthUser; id?: string };
@@ -33,6 +35,7 @@ export function metaFromRequest(req: AppRequest): RequestMeta {
     ip: req.ip ?? null,
     userAgent: typeof ua === 'string' ? ua.slice(0, 300) : null,
     requestId: req.id ?? null,
+    client: req.headers['x-client'] === 'mobile' ? 'mobile' : 'web',
   };
 }
 

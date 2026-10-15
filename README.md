@@ -136,6 +136,22 @@ Por ubicación, desde el backoffice: puestos simultáneos, intervalo entre horas
 - Variables opcionales en `.env`: `ETHERSCAN_API_KEY` (antigüedad en redes EVM), `TRONGRID_API_KEY`, `CHAINALYSIS_SANCTIONS_API_KEY`, `RPC_*_URL`, y `SCREENING_OFFLINE=true` para desarrollo sin red.
 - El proveedor de screening es intercambiable (`ScreeningProvider`) para conectar más adelante Chainalysis KYT, Elliptic o TRM.
 
+### OpenScan y verificación de transacciones
+
+- **Backoffice → Operaciones** lista todas las peticiones con wallet, vengan de la web o de la app (columna *Canal*), con filtros por estado de la wallet, de la transacción, red y canal. **Revisar** despliega la solicitud, la verificación de la transacción y la actividad de la wallet en OpenScan.
+- [OpenScan](https://github.com/openscan-explorer/explorer) se muestra integrado en Solicitudes, Operaciones, la ficha de cada wallet y cada cita, con enlace para abrirlo en una pestaña. Cubre Ethereum, Polygon y BNB Chain; para TRON se enlaza Tronscan, porque OpenScan no lo soporta.
+- Al guardar el **hash de la transacción** en la liquidación, la API lo comprueba en la blockchain:
+  - que existe y se ejecutó con éxito;
+  - que transfiere el USDT/USDC oficial de esa red;
+  - que sale de la wallet del cliente (venta) o llega a ella (compra);
+  - que la contraparte es una dirección de Valorize;
+  - que el importe coincide;
+  - que tiene suficientes confirmaciones.
+- Resultados: *Verificada*, *Verificada con avisos*, *Pendiente de confirmaciones*, *No coincide*, *No encontrada*, *Fallida en la red* y *No se pudo comprobar*.
+- Las pendientes se vuelven a comprobar cada 10 minutos. Un mismo hash no se puede usar en dos operaciones.
+- Las direcciones propias de Valorize por red se configuran en **Backoffice → Cambio cripto**.
+- Variables: `OPENSCAN_URL` en la API (instancia de OpenScan; por defecto la pública) y `OPENSCAN_ORIGIN` en la web (orígenes permitidos para mostrarlo integrado).
+
 ### Probar el flujo de cambio
 
 1. Inicia sesión como `cliente@demo.valorize` / `Cliente1234`, reserva **Cambio USDT / USDC** e indica un importe y una dirección de wallet. La cita debe quedar en "Pendiente de aprobación", todavía sin QR.

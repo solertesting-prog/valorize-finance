@@ -438,6 +438,7 @@ model Booking {
   startsAt        DateTime
   endsAt          DateTime
   status          BookingStatus @default(CONFIRMED)
+  channel         BookingChannel @default(WEB)
   notes           String?       @db.VarChar(500)
   qrNonce         String        @db.VarChar(32) // rota al reprogramar/cancelar → invalida QRs antiguos
   rescheduleCount Int           @default(0)
@@ -464,6 +465,7 @@ model Booking {
   @@index([locationId, startsAt])
   @@index([userId, startsAt])
   @@index([status, startsAt])
+  @@index([channel, createdAt])
   @@map("bookings")
 }
 
@@ -619,10 +621,15 @@ model ExchangeRequest {
   internalNote String?           @db.VarChar(1000)
   /// Al completar la operación en oficina.
   txHash       String?           @db.VarChar(100)
+  /// Verificación on-chain de txHash (ver TxVerificationService).
+  txCheckStatus TxCheckStatus?
+  txCheck       Json?
+  txCheckedAt   DateTime?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
   @@index([walletId])
+  @@index([txCheckStatus])
   @@map("exchange_requests")
 }
 
@@ -684,6 +691,22 @@ model BlockedAddress {
 }
 
 /// Configuración del servicio de cambio (fila única id = 1).
+enum BookingChannel {
+  WEB
+  APP
+  BACKOFFICE
+}
+
+enum TxCheckStatus {
+  PENDING
+  VERIFIED
+  WARNING
+  MISMATCH
+  NOT_FOUND
+  FAILED
+  ERROR
+}
+
 model ExchangeSettings {
   id                 Int            @id @default(1)
   enabledAssets      CryptoAsset[]  @default([USDT, USDC])
@@ -697,6 +720,8 @@ model ExchangeSettings {
   /// Por encima de este importe se exige KYC de nivel 2.
   enhancedKycAbove   Decimal        @default(1000) @db.Decimal(20, 6)
   minWalletAgeDays   Int            @default(7)
+  /// Direcciones propias por red: { "TRON": ["T…"], "ETHEREUM": ["0x…"] }
+  receivingAddresses Json           @default("{}")
   updatedAt          DateTime       @updatedAt
 
   @@map("exchange_settings")

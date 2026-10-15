@@ -110,6 +110,7 @@ export const WebhookEvent = {
   BOOKING_CREATED: 'booking.created',
   BOOKING_REJECTED: 'booking.rejected',
   WALLET_SCREENED: 'wallet.screened',
+  EXCHANGE_TX_VERIFIED: 'exchange.tx_verified',
   BOOKING_CONFIRMED: 'booking.confirmed',
   BOOKING_RESCHEDULED: 'booking.rescheduled',
   BOOKING_CANCELLED: 'booking.cancelled',
@@ -200,4 +201,59 @@ export const EXPLORER_TX_URL: Record<ChainNetwork, string> = {
   ETHEREUM: 'https://etherscan.io/tx/',
   POLYGON: 'https://polygonscan.com/tx/',
   BSC: 'https://bscscan.com/tx/',
+};
+
+// ───────── OpenScan (explorador abierto) ─────────
+
+/** Instancia pública oficial de OpenScan. Se puede sustituir por una propia (OPENSCAN_URL en la API). */
+export const DEFAULT_OPENSCAN_URL = 'https://openscan.eth.link/';
+
+/** Redes que OpenScan soporta, con su chain ID. TRON no está soportado. */
+export const OPENSCAN_CHAIN_ID: Partial<Record<ChainNetwork, number>> = { ETHEREUM: 1, POLYGON: 137, BSC: 56 };
+
+export interface ExplorerLinks {
+  /** Enlace a OpenScan, o null si la red no está soportada. */
+  openscan: string | null;
+  /** Explorador nativo de la red (Tronscan, Etherscan…). */
+  native: string;
+  nativeName: string;
+}
+
+const NATIVE_EXPLORER_NAME: Record<ChainNetwork, string> = { TRON: 'Tronscan', ETHEREUM: 'Etherscan', POLYGON: 'Polygonscan', BSC: 'BscScan' };
+
+/** Enlaces a OpenScan y al explorador nativo para una dirección o una transacción. */
+export function explorerLinks(network: ChainNetwork, kind: 'address' | 'tx', value: string, openscanBase?: string | null): ExplorerLinks {
+  const chain = OPENSCAN_CHAIN_ID[network];
+  const base = (openscanBase || DEFAULT_OPENSCAN_URL).replace(/\/+$/, '').replace(/\/#$/, '');
+  return {
+    openscan: chain ? `${base}/#/${chain}/${kind}/${value}` : null,
+    native: `${kind === 'tx' ? EXPLORER_TX_URL[network] : EXPLORER_ADDRESS_URL[network]}${value}`,
+    nativeName: NATIVE_EXPLORER_NAME[network],
+  };
+}
+
+// ───────── Canal y verificación de transacciones ─────────
+
+export const BookingChannel = { WEB: 'WEB', APP: 'APP', BACKOFFICE: 'BACKOFFICE' } as const;
+export type BookingChannel = (typeof BookingChannel)[keyof typeof BookingChannel];
+export const CHANNEL_LABEL: Record<BookingChannel, string> = { WEB: 'Web', APP: 'App', BACKOFFICE: 'Backoffice' };
+
+export const TxCheckStatus = {
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  WARNING: 'WARNING',
+  MISMATCH: 'MISMATCH',
+  NOT_FOUND: 'NOT_FOUND',
+  FAILED: 'FAILED',
+  ERROR: 'ERROR',
+} as const;
+export type TxCheckStatus = (typeof TxCheckStatus)[keyof typeof TxCheckStatus];
+export const TX_CHECK_LABEL: Record<TxCheckStatus, string> = {
+  PENDING: 'Pendiente de confirmaciones',
+  VERIFIED: 'Verificada',
+  WARNING: 'Verificada con avisos',
+  MISMATCH: 'No coincide',
+  NOT_FOUND: 'No encontrada',
+  FAILED: 'Fallida en la red',
+  ERROR: 'No se pudo comprobar',
 };

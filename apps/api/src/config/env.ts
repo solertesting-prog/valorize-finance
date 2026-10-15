@@ -72,6 +72,8 @@ const envSchema = z.object({
   CHAINALYSIS_SANCTIONS_API_KEY: z.string().optional(),
   /** Desactiva las consultas on-chain (tests / entornos sin red). */
   SCREENING_OFFLINE: bool,
+  /** Instancia de OpenScan (explorador abierto) para revisar wallets y transacciones. */
+  OPENSCAN_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().default('https://openscan.eth.link/')),
 });
 
 export type Env = z.infer<typeof envSchema>;

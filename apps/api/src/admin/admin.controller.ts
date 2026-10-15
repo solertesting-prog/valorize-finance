@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, P
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import {
+  adminExchangeQuerySchema,
   adminUserCreateSchema,
   approveBookingSchema,
   rejectBookingSchema,
@@ -56,6 +57,12 @@ export class AdminController {
         screening: b.exchange ? await this.wallets.latestScreening(b.exchange.walletId) : null,
       })),
     );
+  }
+
+  /** Todas las operaciones de cambio (web y app) con wallet, auditoría y verificación de la transacción. */
+  @Get('exchanges')
+  exchanges(@Query(new ZodPipe(adminExchangeQuerySchema)) q: z.infer<typeof adminExchangeQuerySchema>) {
+    return this.bookings.adminExchanges(q);
   }
 
   @Post('bookings/:id/approve')
