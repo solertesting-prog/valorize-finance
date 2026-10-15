@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { BookingStatus, completeExchangeSchema, IncidentStatus, incidentSchema, incidentUpdateSchema, isoDate, paginationSchema, scanSchema, staffTransitionSchema, uuid } from '@valorize/shared';
+import { BookingStatus, completeExchangeSchema, IncidentStatus, incidentSchema, incidentUpdateSchema, isoDate, paginationSchema, scanReferenceSchema, scanSchema, staffTransitionSchema, uuid } from '@valorize/shared';
 import { z } from 'zod';
 import { AuthUser, CurrentUser, ReqMeta, RequestMeta, Roles } from '../common/auth.decorators';
 import { ZodPipe } from '../common/zod-validation.pipe';
@@ -14,6 +14,7 @@ const dayQuery = z.object({
   q: z.string().trim().max(60).optional(),
 });
 const scanBody = scanSchema.extend({ locationId: uuid });
+const scanRefBody = scanReferenceSchema.extend({ locationId: uuid });
 const incidentQuery = paginationSchema.extend({
   locationId: uuid.optional(),
   status: z.enum(Object.values(IncidentStatus) as [IncidentStatus, ...IncidentStatus[]]).optional(),
@@ -58,6 +59,11 @@ export class StaffController {
   @Post('scan')
   scan(@CurrentUser() u: AuthUser, @Body(new ZodPipe(scanBody)) b: z.infer<typeof scanBody>, @ReqMeta() meta: RequestMeta) {
     return this.bookings.scan(u, b.token, b.locationId, meta);
+  }
+
+  @Post('scan/reference')
+  scanReference(@CurrentUser() u: AuthUser, @Body(new ZodPipe(scanRefBody)) b: z.infer<typeof scanRefBody>, @ReqMeta() meta: RequestMeta) {
+    return this.bookings.scanByReference(u, b.reference, b.locationId, meta);
   }
 
   @Post('bookings/:id/transition')

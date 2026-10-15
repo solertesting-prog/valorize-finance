@@ -17,6 +17,7 @@ export function QrPass({ booking }: { booking: BookingDto }) {
     queryFn: () => api.get<BookingQrDto>(`/me/bookings/${booking.id}/qr`),
     enabled: usable,
     staleTime: 60_000,
+    retry: 2,
   });
   const tz = booking.location.timezone;
 
@@ -46,9 +47,20 @@ export function QrPass({ booking }: { booking: BookingDto }) {
       </View>
       <View style={[p.tile, !usable && { opacity: pending ? 0.3 : 0.15 }]}>
         {qr.data ? (
-          <QRCode value={qr.data.token} size={220} color={c.ink} backgroundColor="#ffffff" ecl="M" />
+          <QRCode value={qr.data.url ?? qr.data.token} size={220} color={c.ink} backgroundColor="#ffffff" ecl="M" />
         ) : (
-          <View style={{ width: 220, height: 220, alignItems: 'center', justifyContent: 'center' }}>{usable ? <ActivityIndicator color={c.ink} /> : null}</View>
+          <View style={{ width: 220, height: 220, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            {usable && qr.isError ? (
+              <>
+                <Text style={{ color: c.ink, fontFamily: f.ui, fontSize: t.sm, textAlign: 'center' }}>No hemos podido cargar el QR.</Text>
+                <Pressable accessibilityRole="button" onPress={() => qr.refetch()} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: r.sm, backgroundColor: c.ink }}>
+                  <Text style={{ color: '#fff', fontFamily: f.uiBold, fontSize: t.sm }}>Reintentar</Text>
+                </Pressable>
+              </>
+            ) : usable ? (
+              <ActivityIndicator color={c.ink} />
+            ) : null}
+          </View>
         )}
       </View>
       <Text style={p.ref}>{booking.reference}</Text>

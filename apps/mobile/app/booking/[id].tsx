@@ -15,7 +15,12 @@ export default function BookingScreen() {
   const [date, setDate] = useState<string | null>(null);
   const [startsAt, setStartsAt] = useState<string | null>(null);
   const [reason, setReason] = useState('');
-  const q = useQuery({ queryKey: ['booking', id], queryFn: () => api.get<BookingDto>(`/me/bookings/${id}`) });
+  // Mientras está pendiente de aprobación, se consulta cada 20 s para mostrar el QR en cuanto se apruebe.
+  const q = useQuery({
+    queryKey: ['booking', id],
+    queryFn: () => api.get<BookingDto>(`/me/bookings/${id}`),
+    refetchInterval: (query) => (query.state.data?.status === 'PENDING' ? 20_000 : false),
+  });
 
   const after = (msg: string) => (b: BookingDto) => {
     qc.setQueryData(['booking', id], b);

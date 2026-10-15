@@ -286,6 +286,7 @@ export const bookingListQuerySchema = paginationSchema.extend({
 });
 
 export const scanSchema = z.object({ token: z.string().min(10).max(512) });
+export const scanReferenceSchema = z.object({ reference: z.string().trim().toUpperCase().min(6).max(20) });
 
 export const staffTransitionSchema = z.object({
   status: z.enum(['CHECKED_IN', 'IN_SERVICE', 'COMPLETED', 'NO_SHOW', 'CANCELLED']),

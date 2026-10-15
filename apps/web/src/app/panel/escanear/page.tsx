@@ -1,9 +1,10 @@
 'use client';
 
 import type React from 'react';
-import { BookingDto, errorMessage, formatTime, fullName, ScanResultDto } from '@valorize/shared';
+import { errorMessage, formatTime, fullName, ScanResultDto } from '@valorize/shared';
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { FormEvent, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useStaffLocation } from '@/components/shells';
 import { useTransition } from '@/components/staff';
 import { ExchangeSummary } from '@/components/exchange';
@@ -23,13 +24,36 @@ const REASON: Record<NonNullable<ScanResultDto['reason']>, string> = {
 
 type Scanner = { start: () => Promise<void>; stop: () => void; destroy: () => void };
 
-/** Escáner de mostrador: cámara del dispositivo (o lector USB que teclea el código) + búsqueda manual. */
+/** El QR contiene un enlace (…/q/<token>); los QR antiguos, el token sin más. */
+function extractToken(raw: string): string {
+  const v = raw.trim();
+  const m = v.match(/\/q\/([^/?#\s]+)/);
+  if (!m) return v;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+}
+
 export default function ScanPage() {
+  return (
+    <Suspense>
+      <Scan />
+    </Suspense>
+  );
+}
+
+/** Escáner de mostrador: cámara del dispositivo (o lector USB que teclea el código) + búsqueda manual. */
+function Scan() {
   const { location } = useStaffLocation();
+  const params = useSearchParams();
+  const router = useRouter();
+  const fromLink = useRef(params.get('t'));
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<Scanner | null>(null);
   const busyRef = useRef(false);
-  const [camera, setCamera] = useState<'idle' | 'on' | 'denied' | 'unavailable'>('idle');
+  const [camera, setCamera] = useState<'idle' | 'on' | 'denied' | 'unavailable' | 'insecure'>('idle');
   const [result, setResult] = useState<ScanResultDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState('');
@@ -42,7 +66,7 @@ export default function ScanPage() {
       scannerRef.current?.stop();
       setError(null);
       try {
-        const r = await api.post<ScanResultDto>('/staff/scan', { token, locationId: location.id });
+        const r = await api.post<ScanResultDto>('/staff/scan', { token: extractToken(token), locationId: location.id });
         setResult(r);
         navigator.vibrate?.(r.valid ? 60 : [80, 60, 80]);
       } catch (e) {
@@ -54,10 +78,21 @@ export default function ScanPage() {
     [location],
   );
 
+  // Llegada desde el enlace del QR (cámara del móvil del empleado): se valida en cuanto hay ubicación.
+  useEffect(() => {
+    const t = fromLink.current;
+    if (!t || !location) return;
+    fromLink.current = null;
+    router.replace('/panel/escanear');
+    void validate(t);
+  }, [location, validate, router]);
+
   const startCamera = useCallback(async () => {
     setResult(null);
     setError(null);
     if (!videoRef.current) return;
+    // Los navegadores solo dan acceso a la cámara en HTTPS o en localhost.
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) return setCamera('insecure');
     try {
       if (!scannerRef.current) {
         const QrScanner = (await import('qr-scanner')).default;
@@ -86,7 +121,7 @@ export default function ScanPage() {
       const now = Date.now();
       if (now - last > 80) buf = '';
       last = now;
-      if (e.key === 'Enter' && buf.startsWith('vf1.')) {
+      if (e.key === 'Enter' && buf.includes('vf1.')) {
         void validate(buf);
         buf = '';
       } else if (e.key.length === 1) buf += e.key;
@@ -95,12 +130,13 @@ export default function ScanPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [validate]);
 
+  /** Búsqueda manual: mismas reglas que el QR (día, oficina, aprobación…), registrada como identificación manual. */
   async function lookup(e: FormEvent) {
     e.preventDefault();
+    if (!location) return;
     setError(null);
     try {
-      const b = await api.get<BookingDto>(`/staff/bookings/by-reference/${encodeURIComponent(manual.trim())}`);
-      setResult({ valid: b.status === 'CONFIRMED' || b.status === 'PENDING', booking: b, warnings: ['Identificación manual: comprueba un documento oficial'] });
+      setResult(await api.post<ScanResultDto>('/staff/scan/reference', { reference: manual.trim(), locationId: location.id }));
       scannerRef.current?.stop();
     } catch (err) {
       setError(errorMessage(err));
@@ -126,6 +162,11 @@ export default function ScanPage() {
               <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 24, textAlign: 'center' }}>
                 {camera === 'denied' ? (
                   <p className="small">No tenemos permiso para usar la cámara. Actívalo en el navegador o identifica al cliente con su referencia.</p>
+                ) : camera === 'insecure' ? (
+                  <p className="small">
+                    El navegador solo permite la cámara en una dirección segura (https) o en localhost. Abre el panel desde la dirección oficial, usa un lector QR o
+                    busca por referencia.
+                  </p>
                 ) : camera === 'unavailable' ? (
                   <p className="small">No hay cámara en este dispositivo. Usa un lector QR o la referencia de la cita.</p>
                 ) : (

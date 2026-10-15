@@ -21,7 +21,12 @@ function BookingDetail() {
   const [startsAt, setStartsAt] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 
-  const q = useQuery({ queryKey: ['booking', id], queryFn: () => api.get<BookingDto>(`/me/bookings/${id}`) });
+  // Mientras la solicitud está pendiente, se consulta cada 20 s: el QR aparece en cuanto se aprueba.
+  const q = useQuery({
+    queryKey: ['booking', id],
+    queryFn: () => api.get<BookingDto>(`/me/bookings/${id}`),
+    refetchInterval: (query) => (query.state.data?.status === 'PENDING' ? 20_000 : false),
+  });
   const b = q.data;
 
   const done = (msg: string) => (nb: BookingDto) => {
@@ -34,7 +39,7 @@ function BookingDetail() {
   };
   const reschedule = useMutation({
     mutationFn: () => api.post<BookingDto>(`/me/bookings/${id}/reschedule`, { startsAt }),
-    onSuccess: done('Cita cambiada. Tu QR se ha actualizado.'),
+    onSuccess: (nb) => done(nb.status === 'PENDING' ? 'Cita cambiada. La revisaremos de nuevo antes de enviarte el QR.' : 'Cita cambiada. Tu QR se ha actualizado.')(nb),
   });
   const cancel = useMutation({
     mutationFn: () => api.post<BookingDto>(`/me/bookings/${id}/cancel`, { reason: reason || undefined }),

@@ -375,8 +375,10 @@ export class BookingsService {
     const b = await this.findOwned(userId, id);
     if (b.status === 'PENDING') throw Errors.conflict('QR_PENDING_APPROVAL', 'El QR estará disponible cuando aprobemos tu solicitud');
     if (b.status !== 'CONFIRMED') throw Errors.conflict('QR_UNAVAILABLE', 'Esta cita ya no tiene un QR válido');
+    const token = this.qr.sign(b.id, b.qrNonce);
     return {
-      token: this.qr.sign(b.id, b.qrNonce),
+      token,
+      url: this.qr.url(token),
       reference: b.reference,
       expiresAt: new Date(b.endsAt.getTime() + this.env.NO_SHOW_GRACE_MIN * 60_000).toISOString(),
     };
@@ -511,6 +513,27 @@ export class BookingsService {
       entityType: 'booking',
       entityId: parsed?.bookingId,
       metadata: { locationId, reason: result.reason, warnings: result.warnings },
+      meta,
+    });
+    return result;
+  }
+
+  /**
+   * Identificación manual por referencia (el cliente no puede mostrar el QR).
+   * Aplica exactamente las mismas reglas que el QR y queda registrada como manual.
+   */
+  async scanByReference(actor: Actor, reference: string, locationId: string, meta: RequestMeta): Promise<ScanResultDto> {
+    await this.assertStaffLocation(actor, locationId);
+    const b = await this.prisma.booking.findUnique({ where: { reference: reference.trim().toUpperCase() }, select: { id: true, qrNonce: true } });
+    const result = await this.evaluateScan(b ? { bookingId: b.id, nonce: b.qrNonce } : null, locationId);
+    if (!b) result.reason = 'NOT_FOUND';
+    result.warnings.unshift('Identificación manual: comprueba un documento oficial');
+    await this.audit.log({
+      actorId: actor.id,
+      action: result.valid ? 'booking.manual_identified' : 'booking.manual_rejected',
+      entityType: 'booking',
+      entityId: b?.id,
+      metadata: { locationId, reference, reason: result.reason },
       meta,
     });
     return result;

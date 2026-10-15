@@ -23,6 +23,7 @@ export function QrPass({ booking }: { booking: BookingDto }) {
     queryFn: () => api.get<BookingQrDto>(`/me/bookings/${booking.id}/qr`),
     enabled: usable,
     staleTime: 60_000,
+    retry: 2,
   });
   const tz = booking.location.timezone;
 
@@ -36,9 +37,20 @@ export function QrPass({ booking }: { booking: BookingDto }) {
       </div>
       <div className="qr-tile" aria-hidden={!usable}>
         {qr.data ? (
-          <QRCodeSVG value={qr.data.token} size={208} level="M" bgColor="#ffffff" fgColor="#07111c" />
+          <QRCodeSVG value={qr.data.url ?? qr.data.token} size={208} level="M" marginSize={2} bgColor="#ffffff" fgColor="#07111c" />
         ) : (
-          <div style={{ width: 208, height: 208, display: 'grid', placeItems: 'center' }}>{usable ? <span className="spinner" /> : null}</div>
+          <div style={{ width: 208, height: 208, display: 'grid', placeItems: 'center', textAlign: 'center' }}>
+            {usable && qr.isError ? (
+              <div className="stack" style={{ color: '#07111c', '--gap': '8px' } as CSSProperties}>
+                <span className="small">No hemos podido cargar el QR.</span>
+                <button className="btn sm" onClick={() => qr.refetch()}>
+                  Reintentar
+                </button>
+              </div>
+            ) : usable ? (
+              <span className="spinner" />
+            ) : null}
+          </div>
         )}
       </div>
       <div className="ref">{booking.reference}</div>

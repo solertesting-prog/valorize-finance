@@ -167,6 +167,8 @@ export interface BookingEventDto {
 
 export interface BookingQrDto {
   token: string;
+  /** Lo que se codifica en el QR: enlace a la web con el token. */
+  url: string;
   reference: string;
   expiresAt: string;
 }
