@@ -1,4 +1,12 @@
 import 'reflect-metadata';
+
+// Carga apps/api/.env en desarrollo (en producción las variables llegan del entorno).
+try {
+  process.loadEnvFile?.('.env');
+} catch {
+  /* sin .env */
+}
+
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
