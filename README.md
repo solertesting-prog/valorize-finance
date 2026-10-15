@@ -136,6 +136,12 @@ Por ubicación, desde el backoffice: puestos simultáneos, intervalo entre horas
 - Variables opcionales en `.env`: `ETHERSCAN_API_KEY` (antigüedad en redes EVM), `TRONGRID_API_KEY`, `CHAINALYSIS_SANCTIONS_API_KEY`, `RPC_*_URL`, y `SCREENING_OFFLINE=true` para desarrollo sin red.
 - El proveedor de screening es intercambiable (`ScreeningProvider`) para conectar más adelante Chainalysis KYT, Elliptic o TRM.
 
+### Probar el flujo de cambio
+
+1. Inicia sesión como `cliente@demo.valorize` / `Cliente1234`, reserva **Cambio USDT / USDC** e indica un importe y una dirección de wallet. La cita debe quedar en "Pendiente de aprobación", todavía sin QR.
+2. Inicia sesión como `admin@valorize.local` / `Admin123456` y entra en **Solicitudes**. La solicitud debe aparecer ahí con el resultado de la auditoría de la wallet. Apruébala.
+3. Vuelve a la cuenta del cliente: el QR ya debe aparecer en la cita.
+
 ## Estado de verificación
 
 Durante la construcción no hubo acceso al registro npm, así que no se pudieron instalar dependencias ni ejecutar `next build` o `nest build`. Lo que sí se verificó:
