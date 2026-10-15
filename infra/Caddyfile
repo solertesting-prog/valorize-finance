@@ -1,0 +1,29 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# Web: cliente, panel del empleado y backoffice. /api/v1 se reenvía a la API desde Next.js (mismo origen).
+{$APP_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		-Server
+	}
+	reverse_proxy web:3000
+}
+
+# API pública para la app móvil.
+{$API_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		-Server
+	}
+	@health path /health/*
+	respond @health 404
+	reverse_proxy api:4000 {
+		lb_policy least_conn
+		health_uri /health/ready
+		health_interval 10s
+	}
+}

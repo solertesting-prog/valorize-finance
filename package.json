@@ -1,0 +1,14 @@
+{
+  "name": "valorize-finance",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter ./apps/api --filter ./apps/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @valorize/api prisma:migrate",
+    "db:seed": "pnpm --filter @valorize/api seed"
+  },
+  "engines": { "node": ">=22" }
+}

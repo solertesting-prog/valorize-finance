@@ -1,0 +1,559 @@
+// Valorize Finance — modelo de datos de producción.
+// PostgreSQL 16. Todos los timestamps en UTC (timestamptz).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext]
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum Role {
+  CUSTOMER
+  EMPLOYEE
+  MANAGER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum VerificationChannel {
+  EMAIL
+  PHONE
+}
+
+enum VerificationPurpose {
+  VERIFY_CONTACT
+  PASSWORD_RESET
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum KycFieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  COUNTRY
+  DOCUMENT
+  BOOLEAN
+}
+
+enum FilePurpose {
+  KYC_DOCUMENT
+  AVATAR
+  INCIDENT_ATTACHMENT
+}
+
+enum FileStatus {
+  PENDING_UPLOAD
+  UPLOADED
+  DELETED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  IN_SERVICE
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED
+  BOOKING_RESCHEDULED
+  BOOKING_CANCELLED
+  BOOKING_REMINDER
+  BOOKING_CHECKED_IN
+  BOOKING_COMPLETED
+  BOOKING_NO_SHOW
+  KYC_STATUS_CHANGED
+  SECURITY
+  SYSTEM
+}
+
+enum DevicePlatform {
+  ios
+  android
+  web
+}
+
+enum IncidentType {
+  INVALID_QR
+  IDENTITY_MISMATCH
+  CUSTOMER_COMPLAINT
+  TECHNICAL
+  OTHER
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+// ───────────────────────────── Identidad ─────────────────────────────
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique @db.Citext
+  phone           String?    @unique @db.VarChar(20)
+  passwordHash    String
+  firstName       String     @db.VarChar(80)
+  lastName        String     @db.VarChar(120)
+  role            Role       @default(CUSTOMER)
+  status          UserStatus @default(ACTIVE)
+  locale          String     @default("es") @db.VarChar(5)
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+  marketingOptIn  Boolean    @default(false)
+  termsAcceptedAt DateTime?
+
+  // MFA (TOTP). El secreto se guarda cifrado con AES-256-GCM (FIELD_ENCRYPTION_KEY).
+  mfaEnabled       Boolean   @default(false)
+  mfaSecretEnc     String?
+  mfaRecoveryCodes String[]  @default([]) // hashes argon2
+  mfaEnabledAt     DateTime?
+
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+  passwordChangedAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  sessions           Session[]
+  verificationCodes  VerificationCode[]
+  kycProfile         KycProfile?
+  kycReviews         KycProfile[]         @relation("KycReviewer")
+  files              File[]
+  bookings           Booking[]            @relation("BookingCustomer")
+  checkIns           Booking[]            @relation("BookingCheckedInBy")
+  bookingEvents      BookingEvent[]
+  notifications      Notification[]
+  devices            PushDevice[]
+  staffLocations     StaffLocation[]
+  incidentsReported  Incident[]           @relation("IncidentReporter")
+  incidentsResolved  Incident[]           @relation("IncidentResolver")
+  auditLogs          AuditLog[]
+
+  @@index([role, status])
+  @@index([lastName, firstName])
+  @@map("users")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String    @unique // sha256 del refresh token opaco
+  family           String    @db.Uuid // rotación: si se reutiliza un token revocado, se revoca la familia
+  client           String    @default("web") @db.VarChar(10)
+  userAgent        String?   @db.VarChar(300)
+  ip               String?   @db.VarChar(64)
+  expiresAt        DateTime
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  revokedReason    String?   @db.VarChar(40)
+  createdAt        DateTime  @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([family])
+  @@map("sessions")
+}
+
+model VerificationCode {
+  id         String              @id @default(uuid()) @db.Uuid
+  userId     String              @db.Uuid
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel    VerificationChannel
+  purpose    VerificationPurpose
+  target     String              @db.VarChar(254) // email o teléfono al que se envió
+  codeHash   String
+  attempts   Int                 @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([userId, channel, purpose, consumedAt])
+  @@map("verification_codes")
+}
+
+// ───────────────────────────── KYC genérico ─────────────────────────────
+// Los requisitos son configurables desde el backoffice: el producto no asume
+// un tipo de documento ni un país concretos.
+
+model KycRequirement {
+  id        String       @id @default(uuid()) @db.Uuid
+  key       String       @unique @db.VarChar(50)
+  label     String       @db.VarChar(120)
+  helpText  String?      @db.VarChar(400)
+  type      KycFieldType
+  required  Boolean      @default(true)
+  options   String[]     @default([])
+  level     Int          @default(1) // nivel de verificación al que pertenece
+  sortOrder Int          @default(0)
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  values KycFieldValue[]
+
+  @@map("kyc_requirements")
+}
+
+model KycProfile {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @db.Uuid
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status          KycStatus @default(NOT_STARTED)
+  level           Int       @default(0)
+  provider        String    @default("manual") @db.VarChar(40) // "manual" o proveedor externo
+  providerRef     String?   @db.VarChar(120)
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewedById    String?   @db.Uuid
+  reviewedBy      User?     @relation("KycReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  rejectionReason String?   @db.VarChar(500)
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  values KycFieldValue[]
+
+  @@index([status])
+  @@map("kyc_profiles")
+}
+
+model KycFieldValue {
+  id            String         @id @default(uuid()) @db.Uuid
+  profileId     String         @db.Uuid
+  profile       KycProfile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  requirementId String         @db.Uuid
+  requirement   KycRequirement @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  valueEnc      String? // valor cifrado (AES-256-GCM): son datos personales
+  fileId        String?        @db.Uuid
+  file          File?          @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([profileId, requirementId])
+  @@map("kyc_field_values")
+}
+
+model File {
+  id          String      @id @default(uuid()) @db.Uuid
+  ownerId     String      @db.Uuid
+  owner       User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  purpose     FilePurpose
+  status      FileStatus  @default(PENDING_UPLOAD)
+  bucket      String      @db.VarChar(80)
+  key         String      @unique @db.VarChar(300)
+  fileName    String      @db.VarChar(200)
+  contentType String      @db.VarChar(80)
+  size        Int
+  sha256      String?     @db.VarChar(64)
+  createdAt   DateTime    @default(now())
+  uploadedAt  DateTime?
+  deletedAt   DateTime?
+
+  kycValues KycFieldValue[]
+  incidents Incident[]
+
+  @@index([ownerId, purpose])
+  @@map("files")
+}
+
+// ───────────────────────────── Red de atención ─────────────────────────────
+
+model Location {
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String   @db.VarChar(120)
+  slug               String   @unique @db.VarChar(80)
+  address            String   @db.VarChar(200)
+  city               String   @db.VarChar(80)
+  postalCode         String?  @db.VarChar(12)
+  country            String   @default("ES") @db.Char(2)
+  latitude           Float
+  longitude          Float
+  timezone           String   @default("Europe/Madrid") @db.VarChar(40)
+  phone              String?  @db.VarChar(20)
+  email              String?  @db.VarChar(254)
+  slotIntervalMin    Int      @default(15)
+  defaultCapacity    Int      @default(2) // puestos de atención simultáneos
+  bookingHorizonDays Int      @default(60)
+  minNoticeMin       Int      @default(60)
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  openingHours OpeningHours[]
+  closures     LocationClosure[]
+  services     LocationService[]
+  bookings     Booking[]
+  staff        StaffLocation[]
+  incidents    Incident[]
+
+  @@index([city, active])
+  @@map("locations")
+}
+
+model OpeningHours {
+  id         String   @id @default(uuid()) @db.Uuid
+  locationId String   @db.Uuid
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  weekday    Int // ISO 1=lunes … 7=domingo
+  opensAt    Int // minutos desde medianoche, hora local
+  closesAt   Int
+
+  @@index([locationId, weekday])
+  @@map("opening_hours")
+}
+
+model LocationClosure {
+  id         String   @id @default(uuid()) @db.Uuid
+  locationId String   @db.Uuid
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  date       DateTime @db.Date
+  reason     String?  @db.VarChar(200)
+  createdAt  DateTime @default(now())
+
+  @@unique([locationId, date])
+  @@map("location_closures")
+}
+
+model Service {
+  id               String   @id @default(uuid()) @db.Uuid
+  code             String   @unique @db.VarChar(32)
+  name             String   @db.VarChar(120)
+  description      String?  @db.VarChar(500)
+  durationMin      Int
+  bufferMin        Int      @default(0)
+  requiresKyc      Boolean  @default(false)
+  requiredKycLevel Int      @default(1)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  locations LocationService[]
+  bookings  Booking[]
+
+  @@map("services")
+}
+
+model LocationService {
+  locationId String   @db.Uuid
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  serviceId  String   @db.Uuid
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  capacity   Int? // override de capacidad para este servicio
+
+  @@id([locationId, serviceId])
+  @@map("location_services")
+}
+
+model StaffLocation {
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  locationId String   @db.Uuid
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([userId, locationId])
+  @@map("staff_locations")
+}
+
+// ───────────────────────────── Reservas ─────────────────────────────
+
+model Booking {
+  id              String        @id @default(uuid()) @db.Uuid
+  reference       String        @unique @db.VarChar(20) // VF-2026-000458
+  userId          String        @db.Uuid
+  user            User          @relation("BookingCustomer", fields: [userId], references: [id], onDelete: Restrict)
+  locationId      String        @db.Uuid
+  location        Location      @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  serviceId       String        @db.Uuid
+  service         Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  startsAt        DateTime
+  endsAt          DateTime
+  status          BookingStatus @default(CONFIRMED)
+  notes           String?       @db.VarChar(500)
+  qrNonce         String        @db.VarChar(32) // rota al reprogramar/cancelar → invalida QRs antiguos
+  rescheduleCount Int           @default(0)
+  remindedAt      DateTime?
+  checkedInAt     DateTime?
+  checkedInById   String?       @db.Uuid
+  checkedInBy     User?         @relation("BookingCheckedInBy", fields: [checkedInById], references: [id], onDelete: SetNull)
+  serviceStartedAt DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  cancelReason    String?       @db.VarChar(300)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  events    BookingEvent[]
+  incidents Incident[]
+
+  @@index([locationId, startsAt])
+  @@index([userId, startsAt])
+  @@index([status, startsAt])
+  @@map("bookings")
+}
+
+model BookingEvent {
+  id         String         @id @default(uuid()) @db.Uuid
+  bookingId  String         @db.Uuid
+  booking    Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromStatus BookingStatus?
+  toStatus   BookingStatus
+  actorId    String?        @db.Uuid
+  actor      User?          @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  note       String?        @db.VarChar(300)
+  metadata   Json?
+  createdAt  DateTime       @default(now())
+
+  @@index([bookingId, createdAt])
+  @@map("booking_events")
+}
+
+model ReferenceCounter {
+  scope String @id @db.VarChar(20) // p. ej. "VF-2026"
+  value Int    @default(0)
+
+  @@map("reference_counters")
+}
+
+// ───────────────────────────── Comunicación ─────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String           @db.VarChar(140)
+  body      String           @db.VarChar(500)
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@map("notifications")
+}
+
+model PushDevice {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String         @unique @db.VarChar(255)
+  platform   DevicePlatform
+  lastSeenAt DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+
+  @@map("push_devices")
+}
+
+model WebhookEndpoint {
+  id          String   @id @default(uuid()) @db.Uuid
+  url         String   @db.VarChar(500)
+  description String?  @db.VarChar(200)
+  secretEnc   String // secreto HMAC cifrado
+  events      String[]
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@map("webhook_endpoints")
+}
+
+model WebhookDelivery {
+  id           String                @id @default(uuid()) @db.Uuid
+  endpointId   String                @db.Uuid
+  endpoint     WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  eventId      String                @db.Uuid // idéntico para todos los endpoints del mismo evento
+  event        String                @db.VarChar(60)
+  payload      Json
+  status       WebhookDeliveryStatus @default(PENDING)
+  attempts     Int                   @default(0)
+  nextAttemptAt DateTime?
+  responseCode Int?
+  error        String?               @db.VarChar(500)
+  createdAt    DateTime              @default(now())
+  deliveredAt  DateTime?
+
+  @@index([endpointId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@map("webhook_deliveries")
+}
+
+// ───────────────────────────── Operación ─────────────────────────────
+
+model Incident {
+  id           String         @id @default(uuid()) @db.Uuid
+  locationId   String         @db.Uuid
+  location     Location       @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  bookingId    String?        @db.Uuid
+  booking      Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  type         IncidentType
+  status       IncidentStatus @default(OPEN)
+  description  String         @db.VarChar(2000)
+  resolution   String?        @db.VarChar(2000)
+  attachmentId String?        @db.Uuid
+  attachment   File?          @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  reportedById String         @db.Uuid
+  reportedBy   User           @relation("IncidentReporter", fields: [reportedById], references: [id], onDelete: Restrict)
+  resolvedById String?        @db.Uuid
+  resolvedBy   User?          @relation("IncidentResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime       @default(now())
+  resolvedAt   DateTime?
+
+  @@index([locationId, status, createdAt])
+  @@map("incidents")
+}
+
+/// Registro de auditoría inmutable (append-only; un trigger impide UPDATE/DELETE).
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: NoAction)
+  action     String   @db.VarChar(80)
+  entityType String?  @db.VarChar(40)
+  entityId   String?  @db.VarChar(64)
+  ip         String?  @db.VarChar(64)
+  userAgent  String?  @db.VarChar(300)
+  requestId  String?  @db.VarChar(64)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
