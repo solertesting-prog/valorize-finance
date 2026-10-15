@@ -28,13 +28,15 @@ export default function Kyc() {
   const p = q.data;
   if (!p) return <Screen edges={['bottom']}><Notice kind="error">{errorMessage(q.error)}</Notice></Screen>;
   const editable = ['NOT_STARTED', 'PENDING', 'REJECTED', 'EXPIRED'].includes(p.status);
+  // Cliente ya verificado que puede completar la verificación ampliada.
+  const upgrading = p.status === 'APPROVED' && !p.upgradeRequestedAt && p.level < p.maxLevel;
 
   async function persist(submit: boolean) {
     setError(null);
     setErrors({});
     setBusy(submit ? 'submit' : 'save');
     try {
-      const fields = p!.requirements.filter((r) => values[r.key]).map((r) => ({ key: r.key, value: values[r.key]?.value ?? null, fileId: values[r.key]?.fileId ?? null }));
+      const fields = p!.requirements.filter((r) => values[r.key] && (!upgrading || r.level > p!.level)).map((r) => ({ key: r.key, value: values[r.key]?.value ?? null, fileId: values[r.key]?.fileId ?? null }));
       qc.setQueryData(['kyc'], await api.put<KycProfileDto>('/me/kyc', { fields, submit }));
       await reload();
       Alert.alert(submit ? 'Enviado a revisión' : 'Borrador guardado', submit ? 'Te avisaremos cuando esté listo.' : undefined);
@@ -56,14 +58,27 @@ export default function Kyc() {
         <KycBadge status={p.status} />
       </Row>
       {p.status === 'IN_REVIEW' ? <Notice>Estamos revisando tus datos. Normalmente tardamos menos de 24 horas laborables.</Notice> : null}
-      {p.status === 'APPROVED' ? <Notice kind="ok">Tu identidad está verificada.</Notice> : null}
+      {p.status === 'APPROVED' ? (
+        <Notice kind="ok">{`Tu identidad está verificada${p.level >= 2 ? ' con la verificación ampliada' : ''}${p.expiresAt ? ` hasta el ${new Date(p.expiresAt).toLocaleDateString('es-ES')}` : ''}.`}</Notice>
+      ) : null}
+      {p.status === 'APPROVED' && p.upgradeRequestedAt ? <Notice>Estamos revisando tu verificación ampliada. Mientras tanto puedes seguir reservando.</Notice> : null}
+      {p.status === 'APPROVED' && p.rejectionReason && !p.upgradeRequestedAt ? (
+        <Notice kind="error">{`No hemos podido aprobar la verificación ampliada: ${p.rejectionReason}.`}</Notice>
+      ) : null}
+      {upgrading ? <Muted>Para operaciones de importe alto necesitamos la verificación ampliada: completa los datos marcados y envíalos.</Muted> : null}
       {p.status === 'REJECTED' ? <Notice kind="error">{`No hemos podido verificarte: ${p.rejectionReason}. Corrige los datos y envíalos de nuevo.`}</Notice> : null}
       {p.status === 'EXPIRED' ? <Notice kind="warn">Tu verificación ha caducado. Actualiza tu documento.</Notice> : null}
       {editable ? <Muted>Tus datos se guardan cifrados y solo los ve el equipo de verificación.</Muted> : null}
       {p.requirements.map((r) => (
-        <KycInput key={r.key} req={r} v={values[r.key]} error={errors[r.key]} editable={editable} onChange={(v) => set(r.key, v)} />
+        <KycInput key={r.key} req={r} v={values[r.key]} error={errors[r.key]} editable={editable || (upgrading && r.level > p.level)} onChange={(v) => set(r.key, v)} />
       ))}
       {error ? <Notice kind="error">{error}</Notice> : null}
+      {upgrading ? (
+        <>
+          <Button title="Solicitar verificación ampliada" variant="primary" size="lg" loading={busy === 'submit'} onPress={() => persist(true)} />
+          <Button title="Guardar borrador" loading={busy === 'save'} onPress={() => persist(false)} />
+        </>
+      ) : null}
       {editable ? (
         <>
           <Button title="Enviar a revisión" variant="primary" size="lg" loading={busy === 'submit'} onPress={() => persist(true)} />
@@ -76,7 +91,7 @@ export default function Kyc() {
 
 function KycInput({ req, v, error, editable, onChange }: { req: KycRequirementDto; v?: V; error?: string; editable: boolean; onChange: (v: Partial<V>) => void }) {
   const [uploading, setUploading] = useState(false);
-  const label = `${req.label}${req.required ? '' : ' (opcional)'}`;
+  const label = `${req.label}${req.level > 1 ? ' (verificación ampliada)' : req.required ? '' : ' (opcional)'}`;
   const value = v?.value ?? '';
 
   if (req.type === 'BOOLEAN')

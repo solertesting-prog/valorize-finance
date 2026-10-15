@@ -12,7 +12,7 @@ export const bookingInclude = {
       lastName: true,
       email: true,
       phone: true,
-      kycProfile: { select: { status: true } },
+      kycProfile: { select: { status: true, expiresAt: true, level: true } },
     },
   },
   exchange: { include: { wallet: true } },

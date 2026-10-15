@@ -276,12 +276,15 @@ model KycProfile {
   reviewedBy      User?     @relation("KycReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   rejectionReason String?   @db.VarChar(500)
   expiresAt       DateTime?
+  /// Cliente ya verificado que ha enviado los datos de un nivel superior (verificación ampliada).
+  upgradeRequestedAt DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   values KycFieldValue[]
 
   @@index([status])
+  @@index([upgradeRequestedAt])
   @@map("kyc_profiles")
 }
 

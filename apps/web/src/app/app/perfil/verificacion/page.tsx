@@ -30,6 +30,8 @@ export default function KycPage() {
   }, [q.data]);
 
   const editable = q.data && ['NOT_STARTED', 'PENDING', 'REJECTED', 'EXPIRED'].includes(q.data.status);
+  // Cliente ya verificado que puede completar la verificación ampliada (niveles superiores).
+  const upgrading = !!q.data && q.data.status === 'APPROVED' && !q.data.upgradeRequestedAt && q.data.level < q.data.maxLevel;
   const levels = useMemo(() => {
     const m = new Map<number, KycRequirementDto[]>();
     q.data?.requirements.forEach((r) => m.set(r.level, [...(m.get(r.level) ?? []), r]));
@@ -43,12 +45,13 @@ export default function KycPage() {
     setBusy(submit ? 'submit' : 'save');
     try {
       const fields = q.data.requirements
-        .filter((r) => values[r.key])
+        .filter((r) => values[r.key] && (!upgrading || r.level > q.data!.level))
         .map((r) => ({ key: r.key, value: values[r.key]?.value ?? null, fileId: values[r.key]?.fileId ?? null }));
       const r = await api.put<KycProfileDto>('/me/kyc', { fields, submit });
       qc.setQueryData(['kyc'], r);
       await reload();
       toast(submit ? 'Enviado a revisión. Te avisaremos cuando esté listo.' : 'Borrador guardado');
+      if (submit) qc.invalidateQueries({ queryKey: ['kyc'] });
     } catch (e) {
       const details = (e as { details?: { path: string; message: string }[] }).details;
       if (Array.isArray(details)) setErrors(Object.fromEntries(details.map((d) => [d.path, d.message])));
@@ -75,8 +78,20 @@ export default function KycPage() {
       {p.status === 'IN_REVIEW' ? <Alert kind="info">Estamos revisando tus datos. Normalmente tardamos menos de 24 horas laborables.</Alert> : null}
       {p.status === 'APPROVED' ? (
         <Alert kind="ok">
-          Tu identidad está verificada{p.expiresAt ? ` hasta el ${new Date(p.expiresAt).toLocaleDateString('es-ES')}` : ''}.
+          Tu identidad está verificada{p.level >= 2 ? ' con la verificación ampliada' : ''}
+          {p.expiresAt ? ` hasta el ${new Date(p.expiresAt).toLocaleDateString('es-ES')}` : ''}.
         </Alert>
+      ) : null}
+      {p.status === 'APPROVED' && p.upgradeRequestedAt ? (
+        <Alert kind="info">Estamos revisando tu verificación ampliada. Mientras tanto puedes seguir reservando con tu verificación actual.</Alert>
+      ) : null}
+      {p.status === 'APPROVED' && p.rejectionReason && !p.upgradeRequestedAt ? (
+        <Alert kind="error">No hemos podido aprobar la verificación ampliada: {p.rejectionReason}. Corrige los datos y envíalos de nuevo.</Alert>
+      ) : null}
+      {upgrading ? (
+        <p className="muted small" style={{ margin: 0 }}>
+          Para operaciones de importe alto necesitamos la verificación ampliada: completa los datos de abajo y envíalos. Tus datos básicos no cambian.
+        </p>
       ) : null}
       {p.status === 'REJECTED' ? <Alert kind="error">No hemos podido verificarte: {p.rejectionReason}. Corrige los datos y envíalos de nuevo.</Alert> : null}
       {p.status === 'EXPIRED' ? <Alert kind="warn">Tu verificación ha caducado. Actualiza tu documento y envíalo de nuevo.</Alert> : null}
@@ -87,7 +102,7 @@ export default function KycPage() {
       ) : null}
 
       {levels.map(([level, reqs]) => (
-        <fieldset key={level} className="card stack" disabled={!editable} style={{ margin: 0 }}>
+        <fieldset key={level} className="card stack" disabled={!(editable || (upgrading && level > p.level))} style={{ margin: 0 }}>
           <legend className="small muted" style={{ padding: '0 8px' }}>
             {level === 1 ? 'Datos básicos' : `Verificación ampliada (nivel ${level})`}
           </legend>
@@ -104,6 +119,16 @@ export default function KycPage() {
       ))}
 
       {error ? <Alert kind="error">{error}</Alert> : null}
+      {upgrading ? (
+        <div className="row">
+          <Button variant="primary" size="lg" loading={busy === 'submit'} onClick={() => persist(true)}>
+            Solicitar verificación ampliada
+          </Button>
+          <Button loading={busy === 'save'} onClick={() => persist(false)}>
+            Guardar borrador
+          </Button>
+        </div>
+      ) : null}
       {editable ? (
         <div className="row">
           <Button variant="primary" size="lg" loading={busy === 'submit'} onClick={() => persist(true)}>
@@ -131,7 +156,7 @@ function KycField({
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const label = `${req.label}${req.required ? '' : ' (opcional)'}`;
+  const label = `${req.label}${req.level > 1 ? ' (verificación ampliada)' : req.required ? '' : ' (opcional)'}`;
   const v = value?.value ?? '';
 
   if (req.type === 'BOOLEAN') {

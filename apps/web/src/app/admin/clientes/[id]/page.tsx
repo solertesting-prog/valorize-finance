@@ -26,6 +26,7 @@ export default function CustomerDetail() {
   const [reject, setReject] = useState(false);
   const [reason, setReason] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
+  const [level, setLevel] = useState<number | null>(null);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['admin', 'user', id] });
   const review = useMutation({
@@ -33,6 +34,7 @@ export default function CustomerDetail() {
       api.post(`/admin/kyc/users/${id}/review`, {
         decision,
         reason: decision === 'REJECTED' ? reason : undefined,
+        level: decision === 'APPROVED' && level ? level : undefined,
         expiresAt: decision === 'APPROVED' && expiresAt ? new Date(`${expiresAt}T23:59:59Z`).toISOString() : undefined,
       }),
     onSuccess: (_, decision) => {
@@ -99,9 +101,47 @@ export default function CustomerDetail() {
                 ))}
               </dl>
               {k.rejectionReason ? <Alert kind="error">Último rechazo: {k.rejectionReason}</Alert> : null}
-              {k.status === 'IN_REVIEW' ? (
+              <div className="row between small">
+                <span className="muted">Nivel aprobado</span>
+                <span>{k.level === 0 ? 'Ninguno' : k.level >= 2 ? `${k.level} · ampliada` : `${k.level} · básica`}</span>
+              </div>
+              <div className="row between small">
+                <span className="muted">Nivel que cubren sus datos</span>
+                <span>{k.levelReached === 0 ? 'Incompletos' : k.levelReached >= 2 ? `${k.levelReached} · ampliada` : `${k.levelReached} · básica`}</span>
+              </div>
+              {k.status === 'APPROVED' && k.expiresAt ? (
+                <div className="row between small">
+                  <span className="muted">Verificación válida hasta</span>
+                  <span>{new Date(k.expiresAt).toLocaleDateString('es-ES')}</span>
+                </div>
+              ) : null}
+              {k.status === 'IN_REVIEW' || (k.status === 'APPROVED' && k.upgradeRequestedAt) ? (
                 <div className="stack">
-                  <TextInput label="Caducidad de la verificación (opcional)" type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} hint="Normalmente, la fecha de caducidad del documento." />
+                  {k.upgradeRequestedAt ? (
+                    <Alert kind="info">El cliente ya está verificado y solicita la verificación ampliada. Si la rechazas, mantiene la básica.</Alert>
+                  ) : null}
+                  {k.levelReached >= 2 && !k.upgradeRequestedAt ? (
+                    <label className="field">
+                      <span className="small" style={{ fontWeight: 600 }}>Nivel a aprobar</span>
+                      <select className="select" value={level ?? k.levelReached} onChange={(e) => setLevel(Number(e.target.value))}>
+                        {Array.from({ length: k.levelReached }, (_, i) => i + 1).map((l) => (
+                          <option key={l} value={l}>
+                            {l === 1 ? '1 · básica' : `${l} · ampliada (operaciones de importe alto)`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  <TextInput
+                    label="Caducidad de la verificación"
+                    type="date"
+                    value={expiresAt}
+                    onChange={(e) => setExpiresAt(e.target.value)}
+                    hint={(() => {
+                      const doc = k.fields.find((f) => f.key === 'id_document_expiry')?.value;
+                      return doc ? `Si lo dejas vacío, caduca con el documento (${doc.split('-').reverse().join('/')}).` : 'Normalmente, la fecha de caducidad del documento.';
+                    })()}
+                  />
                   <div className="row">
                     <Button variant="primary" loading={review.isPending} onClick={() => review.mutate('APPROVED')}>Aprobar</Button>
                     <Button variant="danger" onClick={() => setReject(true)}>Rechazar</Button>

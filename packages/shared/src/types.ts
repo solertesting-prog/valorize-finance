@@ -177,7 +177,27 @@ export interface ScanResultDto {
   valid: boolean;
   reason?: 'INVALID_TOKEN' | 'NOT_FOUND' | 'WRONG_LOCATION' | 'WRONG_DAY' | 'CANCELLED' | 'ALREADY_USED' | 'EXPIRED' | 'NOT_APPROVED';
   booking?: BookingDto;
+  /** Datos de identidad verificados para cotejar con el documento en el mostrador. */
+  identity?: IdentitySummaryDto | null;
   warnings: string[];
+}
+
+/** Resumen de la identidad verificada del cliente, para el personal del mostrador (acceso auditado). */
+export interface IdentitySummaryDto {
+  kycStatus: KycStatus;
+  kycLevel: number;
+  kycExpiresAt: string | null;
+  legalName: string | null;
+  birthDate: string | null;
+  nationality: string | null;
+  documentType: string | null;
+  /** Solo los últimos 4 caracteres. */
+  documentNumberMasked: string | null;
+  documentExpiry: string | null;
+  documentExpired: boolean;
+  /** Fotos del documento (se abren con /files/:id/url; acceso auditado). */
+  documentFrontFileId: string | null;
+  documentBackFileId: string | null;
 }
 
 export interface NotificationDto {
@@ -205,7 +225,14 @@ export interface KycRequirementDto {
 
 export interface KycProfileDto {
   status: KycStatus;
+  /** Nivel aprobado (0 = ninguno, 1 = básico, 2 = ampliado). */
   level: number;
+  /** Nivel que cubren los datos enviados (lo que se aprobaría ahora). */
+  levelReached: number;
+  /** Nivel más alto que se puede solicitar con los requisitos configurados. */
+  maxLevel: number;
+  /** Fecha en la que un cliente ya verificado envió los datos de la verificación ampliada. */
+  upgradeRequestedAt: string | null;
   submittedAt: string | null;
   reviewedAt: string | null;
   expiresAt: string | null;

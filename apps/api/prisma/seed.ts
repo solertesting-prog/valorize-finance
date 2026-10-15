@@ -7,6 +7,7 @@
  */
 import { hash } from '@node-rs/argon2';
 import { PrismaClient } from '@prisma/client';
+import { createCipheriv, randomBytes } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -163,10 +164,11 @@ async function main() {
         emailVerifiedAt: new Date(),
         phoneVerifiedAt: new Date(),
         termsAcceptedAt: new Date(),
-        kycProfile: { create: { status: 'APPROVED', level: 2, reviewedAt: new Date() } },
+        kycProfile: { create: { status: 'APPROVED', level: 1, reviewedAt: new Date() } },
       },
       update: {},
     });
+    await seedDemoIdentity('cliente@demo.valorize');
     console.log('✔ Demo: empleado@demo.valorize / Empleado1234 · cliente@demo.valorize / Cliente1234');
   }
 
@@ -179,3 +181,42 @@ main()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
+
+/** Mismo formato que CryptoService.encrypt (AES-256-GCM): los valores KYC se guardan cifrados. */
+function encrypt(plain: string): string {
+  const key = Buffer.from(process.env.FIELD_ENCRYPTION_KEY ?? '', 'base64');
+  if (key.length !== 32) throw new Error('FIELD_ENCRYPTION_KEY no válida');
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+  return `v1:${iv.toString('base64url')}:${cipher.getAuthTag().toString('base64url')}:${enc.toString('base64url')}`;
+}
+
+/**
+ * Identidad verificada de ejemplo (nivel básico, sin fotos del documento) para probar el mostrador
+ * y la verificación ampliada. Solo si el cliente de demo aún no tiene datos.
+ */
+async function seedDemoIdentity(email: string) {
+  const user = await prisma.user.findUnique({ where: { email }, include: { kycProfile: { include: { values: true } } } });
+  const profile = user?.kycProfile;
+  if (!profile || profile.values.length) return;
+  const expiry = `${new Date().getFullYear() + 4}-06-30`;
+  const data: Record<string, string> = {
+    full_legal_name: 'Jordi Puig Ferrer',
+    birth_date: '1988-04-12',
+    nationality: 'ES',
+    id_document_type: 'DNI',
+    id_document_number: '12345678Z',
+    id_document_expiry: expiry,
+    address_line: 'Carrer de Pelai 12, 08001 Barcelona',
+    residence_country: 'ES',
+  };
+  const reqs = await prisma.kycRequirement.findMany({ where: { key: { in: Object.keys(data) } } });
+  for (const r of reqs) {
+    await prisma.kycFieldValue.create({ data: { profileId: profile.id, requirementId: r.id, valueEnc: encrypt(data[r.key]) } });
+  }
+  await prisma.kycProfile.update({
+    where: { id: profile.id },
+    data: { status: 'APPROVED', level: 1, submittedAt: new Date(), reviewedAt: new Date(), expiresAt: new Date(`${expiry}T23:59:59Z`) },
+  });
+}

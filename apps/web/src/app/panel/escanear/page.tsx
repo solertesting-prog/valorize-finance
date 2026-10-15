@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { errorMessage, formatTime, fullName, ScanResultDto } from '@valorize/shared';
+import { errorMessage, formatTime, fullName, IdentitySummaryDto, KYC_STATUS_LABEL, ScanResultDto } from '@valorize/shared';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useCallback, useEffect, useRef, useState } from 'react';
@@ -206,6 +206,7 @@ function Scan() {
                   <div className="small muted">
                     {b.service.name} · {b.location.name} · {formatTime(b.startsAt, b.location.timezone)}
                   </div>
+                  {result.identity !== undefined ? <IdentityCard identity={result.identity ?? null} /> : null}
                   {b.exchange ? (
                     <div className="card flat" style={{ padding: 12 }}>
                       <ExchangeSummary ex={b.exchange} staff />
@@ -260,6 +261,74 @@ function Scan() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Identidad verificada del cliente para cotejarla con el documento que presenta (acceso registrado). */
+function IdentityCard({ identity: i }: { identity: IdentitySummaryDto | null }) {
+  const [opening, setOpening] = useState<string | null>(null);
+  async function open(fileId: string) {
+    setOpening(fileId);
+    try {
+      const r = await api.get<{ url: string }>(`/files/${fileId}/url`);
+      window.open(r.url, '_blank', 'noopener');
+    } finally {
+      setOpening(null);
+    }
+  }
+  if (!i || i.kycStatus !== 'APPROVED') {
+    return (
+      <Alert kind="warn">
+        Identidad sin verificar{i ? ` (${KYC_STATUS_LABEL[i.kycStatus]})` : ''}. Pide un documento oficial y comprueba que coincide con el nombre de la cita.
+      </Alert>
+    );
+  }
+  const rows: [string, string | null][] = [
+    ['Nombre legal', i.legalName],
+    ['Documento', [i.documentType, i.documentNumberMasked].filter(Boolean).join(' ') || null],
+    ['Fecha de nacimiento', i.birthDate ? i.birthDate.split('-').reverse().join('/') : null],
+    ['Nacionalidad', i.nationality],
+    ['Caduca', i.documentExpiry ? i.documentExpiry.split('-').reverse().join('/') : null],
+  ];
+  return (
+    <div className="card flat stack" style={{ padding: 12, '--gap': '8px' } as React.CSSProperties}>
+      <div className="row between">
+        <strong className="small">Coteja con su documento</strong>
+        <span className="badge ok">{i.kycLevel >= 2 ? 'Verificación ampliada' : 'Verificada'}</span>
+      </div>
+      <dl className="grid" style={{ '--min': '140px', gap: 8, margin: 0 } as React.CSSProperties}>
+        {rows.map(([k, v]) => (
+          <div key={k}>
+            <dt className="xs muted">{k}</dt>
+            <dd className="small" style={{ margin: 0, fontWeight: 600 }}>
+              {v ?? '—'}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {i.documentExpired ? <Alert kind="error">El documento registrado está caducado: pide uno en vigor.</Alert> : null}
+      {i.documentFrontFileId || i.documentBackFileId ? (
+        <div className="row" style={{ gap: 6 }}>
+          {i.documentFrontFileId ? (
+            <Button size="sm" loading={opening === i.documentFrontFileId} onClick={() => open(i.documentFrontFileId!)}>
+              Ver anverso
+            </Button>
+          ) : null}
+          {i.documentBackFileId ? (
+            <Button size="sm" loading={opening === i.documentBackFileId} onClick={() => open(i.documentBackFileId!)}>
+              Ver reverso
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="xs muted" style={{ margin: 0 }}>
+          Sin fotos del documento en el expediente.
+        </p>
+      )}
+      <p className="xs muted" style={{ margin: 0 }}>
+        La consulta de estos datos queda registrada.
+      </p>
     </div>
   );
 }

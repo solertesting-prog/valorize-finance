@@ -15,6 +15,7 @@ import { bookingInclude, BookingFull, BookingRules, toBookingDto } from './booki
 import { ExchangeService } from './exchange.service';
 import { QrService } from './qr.service';
 import { TxVerificationService } from './tx-verification.service';
+import { KycService } from '../kyc/kyc.service';
 
 export interface Actor {
   id: string;
@@ -43,6 +44,7 @@ export class BookingsService {
     private readonly webhooks: WebhooksService,
     private readonly exchange: ExchangeService,
     private readonly txVerification: TxVerificationService,
+    private readonly kyc: KycService,
     @Inject(ENV) private readonly env: Env,
   ) {
     this.rules = { cancelCutoffMin: env.CANCEL_CUTOFF_MIN, maxReschedules: env.MAX_RESCHEDULES };
@@ -507,6 +509,7 @@ export class BookingsService {
     await this.assertStaffLocation(actor, locationId);
     const parsed = this.qr.verify(token);
     const result = await this.evaluateScan(parsed, locationId);
+    if (result.booking?.customer) result.identity = await this.kyc.identitySummary(result.booking.customer.id, actor.id, meta);
     await this.audit.log({
       actorId: actor.id,
       action: result.valid ? 'booking.qr_scanned' : 'booking.qr_rejected',
@@ -528,6 +531,7 @@ export class BookingsService {
     const result = await this.evaluateScan(b ? { bookingId: b.id, nonce: b.qrNonce } : null, locationId);
     if (!b) result.reason = 'NOT_FOUND';
     result.warnings.unshift('Identificación manual: comprueba un documento oficial');
+    if (result.booking?.customer) result.identity = await this.kyc.identitySummary(result.booking.customer.id, actor.id, meta);
     await this.audit.log({
       actorId: actor.id,
       action: result.valid ? 'booking.manual_identified' : 'booking.manual_rejected',
@@ -565,6 +569,7 @@ export class BookingsService {
     if (minutes > this.env.CHECKIN_EARLY_MIN) warnings.push(`Llega ${Math.round(minutes)} min antes de su hora`);
     if (minutes < -this.env.NO_SHOW_GRACE_MIN) warnings.push(`Llega ${Math.round(-minutes)} min tarde`);
     if (b.user.kycProfile?.status !== 'APPROVED') warnings.push('Identidad no verificada: comprueba documentación');
+    else if (b.user.kycProfile.expiresAt && b.user.kycProfile.expiresAt < new Date()) warnings.push('La verificación de identidad ha caducado: pide un documento en vigor');
     if (b.exchange && b.exchange.wallet.riskStatus !== 'CLEAR') warnings.push('Wallet pendiente de revisión: consulta con un responsable');
     return { valid: true, booking, warnings };
   }

@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Empty, ErrorBox, KycBadge, Pager, Spinner } from '@/components/ui';
 import { api } from '@/lib/api';
 
-type Row = { userId: string; name: string; email: string; status: KycStatus; level: number; submittedAt: string | null };
+type Row = { userId: string; name: string; email: string; status: KycStatus; level: number; upgrade?: boolean; submittedAt: string | null };
 
 export default function KycQueue() {
   const [status, setStatus] = useState<KycStatus>('IN_REVIEW');
@@ -25,7 +25,7 @@ export default function KycQueue() {
           <p className="muted">Las más antiguas primero.</p>
         </div>
         <select className="select" style={{ width: 'auto' }} value={status} onChange={(e) => { setStatus(e.target.value as KycStatus); setPage(1); }} aria-label="Estado">
-          {(['IN_REVIEW', 'REJECTED', 'APPROVED', 'EXPIRED', 'PENDING'] as KycStatus[]).map((s) => <option key={s} value={s}>{KYC_STATUS_LABEL[s]}</option>)}
+          {(['IN_REVIEW', 'REJECTED', 'APPROVED', 'EXPIRED', 'PENDING'] as KycStatus[]).map((s) => <option key={s} value={s}>{s === 'IN_REVIEW' ? 'Pendientes de revisar' : KYC_STATUS_LABEL[s]}</option>)}
         </select>
       </div>
       {q.isLoading ? <Spinner /> : <ErrorBox error={q.error} />}
@@ -39,7 +39,7 @@ export default function KycQueue() {
             </div>
             <div className="row">
               {r.submittedAt ? <span className="small muted">Enviada {relativeTime(r.submittedAt)}</span> : null}
-              <KycBadge status={r.status} />
+              {r.upgrade ? <span className="badge info">Verificación ampliada</span> : <KycBadge status={r.status} />}
             </div>
           </Link>
         ))}
