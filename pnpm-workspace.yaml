@@ -7,5 +7,6 @@ onlyBuiltDependencies:
   - prisma
   - "@nestjs/core"
   - esbuild
+  - "@swc/core"
   - sharp
   - msgpackr-extract
