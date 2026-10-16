@@ -83,6 +83,8 @@ export function toBookingDto(b: BookingFull, rules: BookingRules, opts: { includ
     cancelReason: b.cancelReason,
     rescheduleCount: b.rescheduleCount,
     approvedAt: b.approvedAt?.toISOString() ?? null,
+    // Las aprobaciones automáticas no tienen aprobador (las manuales siempre lo registran).
+    autoApproved: !!b.approvedAt && !b.approvedById,
     rejectedAt: b.rejectedAt?.toISOString() ?? null,
     rejectReason: b.rejectReason,
     exchange: b.exchange ? exchangeDto(b.exchange, opts.includeCustomer) : null,

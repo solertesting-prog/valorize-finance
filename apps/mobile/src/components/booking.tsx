@@ -1,4 +1,4 @@
-import { AvailabilityDto, BookingDto, BookingQrDto, formatDateLong, formatTime, todayIn } from '@valorize/shared';
+import { AvailabilityDto, BookingDto, BookingQrDto, bookingSteps, formatDateLong, formatTime, todayIn, TrackerState } from '@valorize/shared';
 import { useQuery } from '@tanstack/react-query';
 import * as Brightness from 'expo-brightness';
 import { useEffect } from 'react';
@@ -183,6 +183,8 @@ export function SlotPicker({
 }
 
 const p = StyleSheet.create({
+  trackCard: { backgroundColor: c.slate, borderColor: c.line, borderWidth: 1, borderRadius: r.md, padding: 18, gap: 12 },
+  trackDot: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: c.ink },
   pass: { backgroundColor: c.slate, borderColor: c.line, borderWidth: 1, borderRadius: r.lg, padding: 22, alignItems: 'center', gap: 10 },
   headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', alignSelf: 'stretch', marginBottom: 6 },
   brand: { fontFamily: f.brand, color: c.mint, letterSpacing: 1 },
@@ -196,3 +198,47 @@ const p = StyleSheet.create({
   slot: { width: 78, paddingVertical: 12, alignItems: 'center', borderRadius: r.sm, borderWidth: 1, borderColor: c.line, backgroundColor: c.slate2 },
   slotText: { color: c.paper, fontFamily: f.brand, fontSize: t.md },
 });
+
+const TRACKER_COLOR: Record<TrackerState, string> = { done: c.mint, current: c.amber, todo: c.line, failed: c.coral };
+const TRACKER_ICON: Record<TrackerState, string> = { done: '✓', current: '•', todo: '', failed: '✕' };
+
+/** Seguimiento de la cita por pasos (solicitud → aprobación → visita → completada). */
+export function StatusTracker({ booking }: { booking: BookingDto }) {
+  const steps = bookingSteps(booking);
+  return (
+    <View style={p.trackCard} accessibilityLabel="Seguimiento">
+      <H2>Seguimiento</H2>
+      {steps.map((st, i) => {
+        const color = TRACKER_COLOR[st.state];
+        const last = i === steps.length - 1;
+        return (
+          <View
+            key={st.key}
+            style={{ flexDirection: 'row', gap: 12 }}
+            accessible
+            accessibilityLabel={`${st.label}, ${st.state === 'done' ? 'hecho' : st.state === 'current' ? 'en curso' : st.state === 'failed' ? 'no completado' : 'pendiente'}${st.detail ? `. ${st.detail}` : ''}`}
+          >
+            <View style={{ alignItems: 'center' }}>
+              <View
+                style={[
+                  p.trackDot,
+                  { borderColor: color },
+                  st.state === 'done' && { backgroundColor: c.mint },
+                ]}
+              >
+                <Text style={{ color: st.state === 'done' ? c.mintInk : color === c.line ? c.fog : color, fontFamily: f.uiBold, fontSize: t.sm }}>
+                  {TRACKER_ICON[st.state] || i + 1}
+                </Text>
+              </View>
+              {!last ? <View style={{ width: 2, flex: 1, minHeight: 14, backgroundColor: st.state === 'done' ? c.mint : c.line }} /> : null}
+            </View>
+            <View style={{ flex: 1, paddingBottom: last ? 0 : 14 }}>
+              <Text style={{ color: st.state === 'todo' ? c.fog : c.paper, fontFamily: f.uiBold, fontSize: t.md, lineHeight: 28 }}>{st.label}</Text>
+              {st.detail ? <Text style={{ color: st.state === 'failed' ? c.coral : c.fog, fontFamily: f.ui, fontSize: t.sm }}>{st.detail}</Text> : null}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}

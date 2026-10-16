@@ -723,6 +723,10 @@ model ExchangeSettings {
   /// Por encima de este importe se exige KYC de nivel 2.
   enhancedKycAbove   Decimal        @default(1000) @db.Decimal(20, 6)
   minWalletAgeDays   Int            @default(7)
+  /// Aprobación automática de solicitudes de clientes de confianza.
+  autoApproveEnabled      Boolean @default(false)
+  autoApproveMaxAmount    Decimal @default(1000) @db.Decimal(20, 6)
+  autoApproveMinCompleted Int     @default(2)
   /// Direcciones propias por red: { "TRON": ["T…"], "ETHEREUM": ["0x…"] }
   receivingAddresses Json           @default("{}")
   updatedAt          DateTime       @updatedAt

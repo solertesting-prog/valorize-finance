@@ -1,6 +1,6 @@
 'use client';
 
-import { BookingDto, formatDate, formatTime, Paginated } from '@valorize/shared';
+import { BookingDto, bookingSteps, formatDate, formatTime, Paginated } from '@valorize/shared';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -55,6 +55,15 @@ export default function MyBookings() {
                 <div className="small muted">
                   {b.service.name} · {b.location.name}
                 </div>
+                {(() => {
+                  // Paso en curso del seguimiento, para ver de un vistazo en qué punto está cada solicitud.
+                  const step = bookingSteps(b).find((s) => s.state === 'current' || s.state === 'failed');
+                  return step && b.status !== 'CONFIRMED' ? (
+                    <div className="xs" style={{ color: step.state === 'failed' ? 'var(--coral)' : 'var(--amber)', marginTop: 2 }}>
+                      {step.label}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </div>
             <StatusBadge status={b.status} />

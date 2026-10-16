@@ -96,6 +96,11 @@ export default function Approvals() {
                     </div>
                   ) : null}
                   {b.exchange ? <ExchangeSummary ex={b.exchange} staff /> : <p className="small muted">{b.service.name}</p>}
+                  {item.autoApproveBlockers?.length ? (
+                    <p className="xs muted" style={{ margin: 0 }}>
+                      No se aprobó sola: {item.autoApproveBlockers.join(' · ')}.
+                    </p>
+                  ) : null}
                   {b.notes ? <p className="small" style={{ margin: 0 }}>“{b.notes}”</p> : null}
                 </div>
                 {item.screening ? (

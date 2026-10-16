@@ -391,6 +391,9 @@ export const exchangeSettingsSchema = z.object({
   monthlyLimitPerUser: amountString,
   enhancedKycAbove: amountString,
   minWalletAgeDays: z.number().int().min(0).max(3650),
+  autoApproveEnabled: z.boolean().default(false),
+  autoApproveMaxAmount: amountString.default('1000'),
+  autoApproveMinCompleted: z.number().int().min(1).max(100).default(2),
   /** Direcciones propias de Valorize por red: se usan para comprobar la contraparte de cada transacción. */
   receivingAddresses: z
     .object({

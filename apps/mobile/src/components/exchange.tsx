@@ -7,11 +7,14 @@ import {
   ExchangeDto,
   ExchangeSettingsDto,
   explorerLinks,
+  NETWORK_GUIDE,
   NETWORK_LABEL,
+  networkTips,
   walletAddressShape,
   WalletDto,
 } from '@valorize/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type React from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { api } from '../lib/api';
 import { c, f, r, t } from '../theme';
@@ -25,6 +28,8 @@ export interface ExchangeDraft {
   walletId: string | null;
   newAddress: string;
   newLabel: string;
+  /** El cliente confirma que su wallet usa la red elegida. */
+  networkConfirmed: boolean;
 }
 
 export const emptyExchange = (s?: ExchangeSettingsDto): ExchangeDraft => ({
@@ -35,6 +40,7 @@ export const emptyExchange = (s?: ExchangeSettingsDto): ExchangeDraft => ({
   walletId: null,
   newAddress: '',
   newLabel: '',
+  networkConfirmed: false,
 });
 
 export function exchangeError(d: ExchangeDraft, s: ExchangeSettingsDto | undefined): string | null {
@@ -42,6 +48,7 @@ export function exchangeError(d: ExchangeDraft, s: ExchangeSettingsDto | undefin
   if (!d.amount || !Number.isFinite(n) || n <= 0) return 'Indica el importe';
   if (s && n < Number(s.minAmount)) return `El mínimo es ${s.minAmount} ${d.asset}`;
   if (s && n > Number(s.maxAmount)) return `El máximo por operación es ${s.maxAmount} ${d.asset}`;
+  if (!d.networkConfirmed) return `Confirma que tu wallet usa la red ${NETWORK_LABEL[d.network]}`;
   if (!d.walletId) {
     if (!d.newAddress.trim()) return 'Indica la dirección de tu wallet';
     if (!walletAddressShape[d.network].test(d.newAddress.trim())) {
@@ -121,7 +128,7 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
         <Label>Moneda</Label>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {s.enabledAssets.map((a) => (
-            <Pill key={a} label={a} selected={value.asset === a} onPress={() => set({ asset: a })} />
+            <Pill key={a} label={a} selected={value.asset === a} onPress={() => set({ asset: a, networkConfirmed: false })} />
           ))}
         </View>
       </View>
@@ -130,10 +137,37 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
         <Label>Red</Label>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {s.enabledNetworks.map((n) => (
-            <Pill key={n} label={NETWORK_LABEL[n]} selected={value.network === n} onPress={() => set({ network: n, walletId: null })} />
+            <Pill key={n} label={NETWORK_LABEL[n]} selected={value.network === n} onPress={() => set({ network: n, walletId: null, networkConfirmed: false })} />
           ))}
         </View>
       </View>
+
+      <NetworkGuideBox network={value.network} asset={value.asset} direction={value.direction}>
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: value.networkConfirmed }}
+          onPress={() => set({ networkConfirmed: !value.networkConfirmed })}
+          style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8 }}
+        >
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              borderWidth: 2,
+              borderColor: value.networkConfirmed ? c.mint : c.fog,
+              backgroundColor: value.networkConfirmed ? c.mint : 'transparent',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {value.networkConfirmed ? <Text style={{ color: c.mintInk, fontFamily: f.uiBold }}>✓</Text> : null}
+          </View>
+          <Text style={{ flex: 1, color: c.paper, fontFamily: f.uiBold, fontSize: t.sm }}>
+            He comprobado que mi wallet usa la red {NETWORK_LABEL[value.network]} para {value.asset}
+          </Text>
+        </Pressable>
+      </NetworkGuideBox>
 
       <Field
         label={`Importe en ${value.asset}`}
@@ -168,6 +202,33 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
         ) : null}
         <Muted style={{ fontSize: t.xs }}>Revisamos cada wallet antes de aprobar la operación, como exige la normativa de prevención de blanqueo.</Muted>
       </View>
+    </View>
+  );
+}
+
+/** Guía para no equivocarse de red al enviar o recibir. */
+export function NetworkGuideBox({
+  network,
+  asset,
+  direction,
+  children,
+}: {
+  network: ChainNetwork;
+  asset: CryptoAsset;
+  direction: ExchangeDirection;
+  children?: React.ReactNode;
+}) {
+  return (
+    <View style={{ backgroundColor: c.skySoft, borderColor: c.sky, borderWidth: 1, borderRadius: r.sm, padding: 12, gap: 6 }} accessibilityRole="summary">
+      <Text style={{ color: c.paper, fontFamily: f.uiBold, fontSize: t.sm }}>
+        Red {NETWORK_LABEL[network]} · {NETWORK_GUIDE[network].standard}
+      </Text>
+      {networkTips(network, asset, direction).map((tip) => (
+        <Text key={tip} style={{ color: c.paper, fontFamily: f.ui, fontSize: t.sm, lineHeight: t.sm * 1.45 }}>
+          • {tip}
+        </Text>
+      ))}
+      {children}
     </View>
   );
 }

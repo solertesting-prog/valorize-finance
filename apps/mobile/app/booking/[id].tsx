@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
-import { QrPass, SlotPicker } from '@/components/booking';
-import { ExchangeSummary } from '@/components/exchange';
+import { QrPass, SlotPicker, StatusTracker } from '@/components/booking';
+import { ExchangeSummary, NetworkGuideBox } from '@/components/exchange';
+import { c } from '@/theme';
 import { Body, Button, Card, Field, H2, Loader, Muted, Notice, Screen } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -46,12 +47,17 @@ export default function BookingScreen() {
         <Notice kind="error">No hemos podido aceptar esta solicitud.{b.rejectReason ? ` Motivo: ${b.rejectReason}` : ''}</Notice>
       ) : null}
       <QrPass booking={b} />
+      <StatusTracker booking={b} />
       {b.exchange ? (
         <Card>
           <H2>Tu operación</H2>
           <ExchangeSummary ex={b.exchange} />
-          {b.exchange.direction === 'SELL_CRYPTO' && b.status === 'CONFIRMED' ? (
-            <Muted style={{ fontSize: 13 }}>Envía los fondos solo desde esta wallet y en la oficina, cuando te lo indique el personal.</Muted>
+          {['PENDING', 'CONFIRMED'].includes(b.status) ? (
+            <NetworkGuideBox network={b.exchange.network} asset={b.exchange.asset} direction={b.exchange.direction}>
+              {b.exchange.direction === 'SELL_CRYPTO' ? (
+                <Muted style={{ fontSize: 13, color: c.paper }}>Envía los fondos solo desde esta wallet y en la oficina, cuando te lo indique el personal.</Muted>
+              ) : null}
+            </NetworkGuideBox>
           ) : null}
         </Card>
       ) : null}

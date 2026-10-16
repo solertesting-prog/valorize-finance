@@ -148,6 +148,8 @@ export interface BookingDto {
   cancelReason: string | null;
   rescheduleCount: number;
   approvedAt: string | null;
+  /** Aprobada sin intervención del equipo (cliente de confianza). */
+  autoApproved: boolean;
   rejectedAt: string | null;
   rejectReason: string | null;
   exchange: ExchangeDto | null;
@@ -450,6 +452,10 @@ export interface ExchangeSettingsDto {
   monthlyLimitPerUser: string;
   enhancedKycAbove: string;
   minWalletAgeDays: number;
+  /** Aprobación automática para clientes de confianza (solo backoffice). */
+  autoApproveEnabled?: boolean;
+  autoApproveMaxAmount?: string;
+  autoApproveMinCompleted?: number;
   /** Instancia de OpenScan para revisar wallets y transacciones. */
   openscanUrl: string;
   /** Direcciones propias de Valorize por red (solo backoffice). */
@@ -459,4 +465,6 @@ export interface ExchangeSettingsDto {
 export interface PendingApprovalDto {
   booking: BookingDto;
   screening: WalletScreeningDto | null;
+  /** Motivos por los que no se aprobó automáticamente. */
+  autoApproveBlockers?: string[];
 }

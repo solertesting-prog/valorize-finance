@@ -121,6 +121,34 @@ export default function ExchangeSettingsPage() {
         </fieldset>
 
         <fieldset className="card stack" disabled={readOnly} style={{ margin: 0 }}>
+          <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Aprobación automática</h2>
+          <label className="check">
+            <input type="checkbox" checked={!!f.autoApproveEnabled} onChange={(e) => setF({ ...f, autoApproveEnabled: e.target.checked })} />
+            <span>Aprobar solas las solicitudes de clientes de confianza</span>
+          </label>
+          <p className="small muted" style={{ margin: 0 }}>
+            Se aprueba sin revisión solo si se cumple todo: identidad verificada y en vigor, wallet sin riesgos y ya usada en una operación completada,
+            sin transacciones que no cuadraran y el importe y las operaciones previas de abajo. Lo demás sigue llegando a Solicitudes, con el motivo.
+          </p>
+          <div className="grid" style={{ '--min': '200px' } as React.CSSProperties}>
+            <TextInput
+              label="Importe máximo"
+              inputMode="decimal"
+              value={f.autoApproveMaxAmount ?? ''}
+              onChange={(e) => setF({ ...f, autoApproveMaxAmount: e.target.value })}
+              hint="En USDT/USDC por operación."
+            />
+            <TextInput
+              label="Operaciones completadas mínimas"
+              type="number"
+              min={1}
+              value={f.autoApproveMinCompleted ?? 2}
+              onChange={(e) => setF({ ...f, autoApproveMinCompleted: Number(e.target.value) })}
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="card stack" disabled={readOnly} style={{ margin: 0 }}>
           <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Direcciones de Valorize</h2>
           <p className="small muted" style={{ margin: 0 }}>
             Las wallets de la empresa en cada red, una por línea. Al verificar cada transacción comprobamos que el cliente envía a una de ellas (venta) o

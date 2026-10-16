@@ -284,7 +284,14 @@ export class WalletsService {
       enhancedKycAbove: s.enhancedKycAbove.toString(),
       minWalletAgeDays: s.minWalletAgeDays,
       openscanUrl: this.env.OPENSCAN_URL,
-      ...(admin ? { receivingAddresses: normalizeReceiving(s.receivingAddresses, true) } : {}),
+      ...(admin
+        ? {
+            receivingAddresses: normalizeReceiving(s.receivingAddresses, true),
+            autoApproveEnabled: s.autoApproveEnabled,
+            autoApproveMaxAmount: s.autoApproveMaxAmount.toString(),
+            autoApproveMinCompleted: s.autoApproveMinCompleted,
+          }
+        : {}),
     };
   }
 

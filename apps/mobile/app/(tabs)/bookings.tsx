@@ -1,4 +1,4 @@
-import { BookingDto, formatDate, formatTime, Paginated } from '@valorize/shared';
+import { BookingDto, bookingSteps, formatDate, formatTime, Paginated } from '@valorize/shared';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -51,6 +51,12 @@ export default function Bookings() {
                   <Muted style={{ fontSize: t.sm }}>
                     {b.service.name} · {b.location.name}
                   </Muted>
+                  {(() => {
+                    const step = bookingSteps(b).find((s) => s.state === 'current' || s.state === 'failed');
+                    return step && b.status !== 'CONFIRMED' ? (
+                      <Muted style={{ fontSize: t.xs, color: step.state === 'failed' ? c.coral : c.amber }}>{step.label}</Muted>
+                    ) : null;
+                  })()}
                 </View>
               </Row>
               <StatusBadge status={b.status} />

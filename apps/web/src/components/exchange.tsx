@@ -9,7 +9,9 @@ import {
   ExchangeDto,
   ExchangeSettingsDto,
   explorerLinks,
+  NETWORK_GUIDE,
   NETWORK_LABEL,
+  networkTips,
   ScreeningCheckDto,
   WALLET_RISK_LABEL,
   walletAddressShape,
@@ -18,6 +20,7 @@ import {
   WalletScreeningDto,
 } from '@valorize/shared';
 import { useQuery } from '@tanstack/react-query';
+import type React from 'react';
 import type { CSSProperties } from 'react';
 import { api } from '@/lib/api';
 import { Spinner } from './ui';
@@ -30,6 +33,8 @@ export interface ExchangeDraft {
   walletId: string | null;
   newAddress: string;
   newLabel: string;
+  /** El cliente confirma que su wallet usa la red elegida. */
+  networkConfirmed: boolean;
 }
 
 export const emptyExchange = (s?: ExchangeSettingsDto): ExchangeDraft => ({
@@ -40,6 +45,7 @@ export const emptyExchange = (s?: ExchangeSettingsDto): ExchangeDraft => ({
   walletId: null,
   newAddress: '',
   newLabel: '',
+  networkConfirmed: false,
 });
 
 /** Valida el borrador en cliente. Devuelve el primer error o null. */
@@ -48,6 +54,7 @@ export function exchangeError(d: ExchangeDraft, s: ExchangeSettingsDto | undefin
   if (!d.amount || !Number.isFinite(n) || n <= 0) return 'Indica el importe';
   if (s && n < Number(s.minAmount)) return `El mínimo es ${s.minAmount} ${d.asset}`;
   if (s && n > Number(s.maxAmount)) return `El máximo por operación es ${s.maxAmount} ${d.asset}`;
+  if (!d.networkConfirmed) return `Confirma que tu wallet usa la red ${NETWORK_LABEL[d.network]}`;
   if (!d.walletId) {
     if (!d.newAddress.trim()) return 'Indica la dirección de tu wallet';
     if (!walletAddressShape[d.network].test(d.newAddress.trim())) {
@@ -108,7 +115,7 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
           <label htmlFor="ex-asset">Moneda</label>
           <div className="row" role="group" id="ex-asset" style={{ gap: 8 }}>
             {s.enabledAssets.map((a) => (
-              <button key={a} type="button" className={`btn ${value.asset === a ? 'primary' : ''}`} aria-pressed={value.asset === a} onClick={() => set({ asset: a })}>
+              <button key={a} type="button" className={`btn ${value.asset === a ? 'primary' : ''}`} aria-pressed={value.asset === a} onClick={() => set({ asset: a, networkConfirmed: false })}>
                 {a}
               </button>
             ))}
@@ -116,7 +123,7 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
         </div>
         <div className="field">
           <label htmlFor="ex-network">Red</label>
-          <select id="ex-network" className="select" value={value.network} onChange={(e) => set({ network: e.target.value as ChainNetwork, walletId: null })}>
+          <select id="ex-network" className="select" value={value.network} onChange={(e) => set({ network: e.target.value as ChainNetwork, walletId: null, networkConfirmed: false })}>
             {s.enabledNetworks.map((n) => (
               <option key={n} value={n}>
                 {NETWORK_LABEL[n]}
@@ -125,6 +132,15 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
           </select>
         </div>
       </div>
+
+      <NetworkGuideBox network={value.network} asset={value.asset} direction={value.direction}>
+        <label className="check" style={{ marginTop: 4 }}>
+          <input type="checkbox" checked={value.networkConfirmed} onChange={(e) => set({ networkConfirmed: e.target.checked })} />
+          <span>
+            He comprobado que mi wallet usa la red <strong>{NETWORK_LABEL[value.network]}</strong> para {value.asset}
+          </span>
+        </label>
+      </NetworkGuideBox>
 
       <div className="field">
         <label htmlFor="ex-amount">Importe en {value.asset}</label>
@@ -186,6 +202,33 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
           Revisamos cada wallet antes de aprobar la operación, como exige la normativa de prevención de blanqueo.
         </p>
       </fieldset>
+    </div>
+  );
+}
+
+/** Guía para no equivocarse de red al enviar o recibir. */
+export function NetworkGuideBox({
+  network,
+  asset,
+  direction,
+  children,
+}: {
+  network: ChainNetwork;
+  asset: CryptoAsset;
+  direction: ExchangeDirection;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="alert info" role="note">
+      <strong className="small">
+        Red {NETWORK_LABEL[network]} · {NETWORK_GUIDE[network].standard}
+      </strong>
+      <ul className="small" style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+        {networkTips(network, asset, direction).map((t) => (
+          <li key={t}>{t}</li>
+        ))}
+      </ul>
+      {children}
     </div>
   );
 }

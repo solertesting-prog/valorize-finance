@@ -53,7 +53,10 @@ export function BookingAdminView({ id, basePath, apiBase }: { id: string; basePa
             {formatDateLong(b.startsAt, tz)}, {formatTime(b.startsAt, tz)} · {b.location.name} · <span style={{ textTransform: 'none' }}>solicitada desde {CHANNEL_LABEL[b.channel]}</span>
           </p>
         </div>
-        <StatusBadge status={b.status} />
+        <div className="row" style={{ gap: 8 }}>
+          {b.autoApproved ? <span className="badge info">Aprobada automáticamente</span> : null}
+          <StatusBadge status={b.status} />
+        </div>
       </div>
 
       <div className="grid" style={{ '--min': '300px', alignItems: 'start' } as React.CSSProperties}>

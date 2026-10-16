@@ -6,8 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
-import { QrPass, SlotPicker } from '@/components/booking';
-import { ExchangeSummary } from '@/components/exchange';
+import { QrPass, SlotPicker, StatusTracker } from '@/components/booking';
+import { ExchangeSummary, NetworkGuideBox } from '@/components/exchange';
 import { Alert, Button, ErrorBox, Modal, Spinner, TextInput, useToast } from '@/components/ui';
 import { api, authFetch } from '@/lib/api';
 
@@ -64,20 +64,29 @@ function BookingDetail() {
       </Link>
       {params.get('nueva') ? (
         <Alert kind="ok">
-          {b.status === 'PENDING' ? 'Solicitud enviada. Te avisaremos en cuanto la revisemos.' : 'Reserva confirmada. Te hemos enviado los detalles por email.'}
+          {b.status === 'PENDING'
+            ? 'Solicitud enviada. Te avisaremos en cuanto la revisemos.'
+            : b.autoApproved
+              ? 'Solicitud aprobada al momento: ya tienes tu QR. Te hemos enviado los detalles por email.'
+              : 'Reserva confirmada. Te hemos enviado los detalles por email.'}
         </Alert>
       ) : null}
       {b.status === 'REJECTED' ? <Alert kind="error">No hemos podido aprobar esta solicitud. Motivo: {b.rejectReason}</Alert> : null}
       <QrPass booking={b} />
+      <StatusTracker booking={b} />
 
       {b.exchange ? (
         <div className="card stack">
           <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Tu operación</h2>
           <ExchangeSummary ex={b.exchange} />
-          {b.exchange.direction === 'SELL_CRYPTO' && b.status === 'CONFIRMED' ? (
-            <p className="xs muted" style={{ margin: 0 }}>
-              Envía los fondos en la oficina, delante del empleado, desde esta misma wallet. No hagas envíos antes de la cita.
-            </p>
+          {['PENDING', 'CONFIRMED'].includes(b.status) ? (
+            <NetworkGuideBox network={b.exchange.network} asset={b.exchange.asset} direction={b.exchange.direction}>
+              {b.exchange.direction === 'SELL_CRYPTO' ? (
+                <p className="small" style={{ margin: '6px 0 0' }}>
+                  Envía los fondos en la oficina, delante del empleado, desde esta misma wallet. No hagas envíos antes de la cita.
+                </p>
+              ) : null}
+            </NetworkGuideBox>
           ) : null}
         </div>
       ) : null}

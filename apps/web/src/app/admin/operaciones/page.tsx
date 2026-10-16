@@ -107,6 +107,7 @@ export default function Operations() {
                           {new Date(b.startsAt).toLocaleDateString('es-ES')} <span className="mono">{formatTime(b.startsAt, b.location.timezone)}</span>
                         </div>
                         <StatusBadge status={b.status} />
+                        {b.autoApproved ? <div className="xs muted">Aprobada automáticamente</div> : null}
                       </td>
                       <td className="small">{b.customer ? <Link href={`/admin/clientes/${b.customer.id}`}>{fullName(b.customer)}</Link> : '—'}</td>
                       <td>

@@ -406,3 +406,22 @@ dialog.modal .foot { display: flex; justify-content: flex-end; gap: 8px; padding
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* Seguimiento de la solicitud por pasos */
+.tracker { list-style: none; padding: 0; margin: 0; }
+.tracker li { position: relative; display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding-bottom: 18px; }
+.tracker li:last-child { padding-bottom: 0; }
+.tracker li:not(:last-child)::after { content: ''; position: absolute; left: 13px; top: 28px; bottom: 2px; width: 2px; background: var(--line); }
+.tracker li.done:not(:last-child)::after { background: var(--mint); }
+.tracker .dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; border: 2px solid var(--line); color: var(--fog); background: var(--ink); }
+.tracker .done .dot { background: var(--mint); border-color: var(--mint); color: var(--ink); }
+.tracker .current .dot { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 0 4px color-mix(in srgb, var(--amber) 20%, transparent); }
+.tracker .failed .dot { border-color: var(--coral); color: var(--coral); }
+.tracker .label { font-weight: 600; line-height: 28px; }
+.tracker .todo .label { color: var(--fog); }
+.tracker .detail { font-size: var(--t-sm); color: var(--fog); margin-top: -2px; overflow-wrap: anywhere; }
+.tracker .failed .detail { color: var(--coral); }
+@media (prefers-reduced-motion: no-preference) {
+  .tracker .current .dot { animation: tracker-pulse 2s ease-in-out infinite; }
+  @keyframes tracker-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--amber) 10%, transparent); } }
+}

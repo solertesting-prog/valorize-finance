@@ -51,10 +51,13 @@ export class AdminController {
   @Get('approvals')
   async approvals(@Query(new ZodPipe(approvalsQuery)) q: z.infer<typeof approvalsQuery>) {
     const rows = await this.bookings.pendingApprovals(q.locationId);
+    const settings = await this.prisma.exchangeSettings.findUnique({ where: { id: 1 } });
     return Promise.all(
       rows.map(async (b) => ({
         booking: this.bookings.dto(b, true),
         screening: b.exchange ? await this.wallets.latestScreening(b.exchange.walletId) : null,
+        // Por qué no se aprobó sola (solo si la aprobación automática está activada).
+        autoApproveBlockers: settings?.autoApproveEnabled && b.exchange ? await this.bookings.autoApproveBlockers(b, settings) : undefined,
       })),
     );
   }

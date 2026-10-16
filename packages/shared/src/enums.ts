@@ -257,3 +257,41 @@ export const TX_CHECK_LABEL: Record<TxCheckStatus, string> = {
   FAILED: 'Fallida en la red',
   ERROR: 'No se pudo comprobar',
 };
+
+// ───────── Guía de red (evitar envíos por la red equivocada) ─────────
+
+export interface NetworkGuide {
+  /** Nombre del estándar del token en esa red. */
+  standard: string;
+  /** Cómo aparece normalmente en wallets y exchanges. */
+  pickInWallet: string;
+  /** Moneda con la que se paga la comisión de red. */
+  feeCoin: string;
+  addressStartsWith: 'T' | '0x';
+}
+
+export const NETWORK_GUIDE: Record<ChainNetwork, NetworkGuide> = {
+  TRON: { standard: 'TRC-20', pickInWallet: '«TRON (TRC20)»', feeCoin: 'TRX', addressStartsWith: 'T' },
+  ETHEREUM: { standard: 'ERC-20', pickInWallet: '«Ethereum (ERC20)»', feeCoin: 'ETH', addressStartsWith: '0x' },
+  POLYGON: { standard: 'Polygon PoS', pickInWallet: '«Polygon» o «Polygon PoS»', feeCoin: 'POL (antes MATIC)', addressStartsWith: '0x' },
+  BSC: { standard: 'BEP-20', pickInWallet: '«BNB Smart Chain (BEP20)»', feeCoin: 'BNB', addressStartsWith: '0x' },
+};
+
+/** Consejos para no perder fondos al enviar o recibir por una red concreta. */
+export function networkTips(network: ChainNetwork, asset: CryptoAsset, direction: ExchangeDirection): string[] {
+  const g = NETWORK_GUIDE[network];
+  const tips = [
+    `En tu wallet o exchange elige la red ${g.pickInWallet}: ${asset} en ${NETWORK_LABEL[network]} (${g.standard}).`,
+    direction === 'SELL_CRYPTO'
+      ? `Para enviar necesitarás un poco de ${g.feeCoin} en la wallet para pagar la comisión de red.`
+      : `Comprueba que tu wallet muestra ${asset} en ${NETWORK_LABEL[network]}; si no aparece, añade el token antes de la cita.`,
+  ];
+  if (g.addressStartsWith === '0x') {
+    tips.push('Las direcciones 0x… son iguales en Ethereum, Polygon y BNB Chain: el formato no te avisará si te equivocas de red.');
+  }
+  if (network === 'TRON' && asset === 'USDC') {
+    tips.push('Circle ha retirado el soporte de USDC en TRON y muchas wallets ya no lo admiten. Si puedes, elige otra red.');
+  }
+  tips.push('Si envías por otra red, los fondos se pueden perder y no podremos recuperarlos.');
+  return tips;
+}

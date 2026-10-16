@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BookingStatus, NotificationType, Prisma, Role } from '@prisma/client';
 import type { AdminExchangeQuery, ApproveBookingInput, BookingDto, BookingEventDto, BookingQrDto, CreateBookingInput, ScanResultDto } from '@valorize/shared';
 import { ACTIVE_BOOKING_STATUSES, BOOKING_TRANSITIONS, formatDateTime, WebhookEvent } from '@valorize/shared';
@@ -34,6 +34,8 @@ const STATUS_EVENT: Partial<Record<BookingStatus, WebhookEvent>> = {
 @Injectable()
 export class BookingsService {
   readonly rules: BookingRules;
+
+  private readonly logger = new Logger(BookingsService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -138,6 +140,15 @@ export class BookingsService {
       { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 15_000 },
     );
 
+    // Cliente de confianza: la solicitud se aprueba sola (si no cumple algo, queda pendiente como siempre).
+    if (booking.status === 'PENDING' && booking.exchange) {
+      const auto = await this.autoApproveIfTrusted(booking, meta).catch((e) => {
+        this.logger.warn(`Aprobación automática de ${booking.reference}: ${(e as Error).message}`);
+        return null;
+      });
+      if (auto) return this.dto(auto);
+    }
+
     const when = formatDateTime(booking.startsAt.toISOString(), booking.location.timezone);
     if (booking.status === 'PENDING') {
       void this.notifications.notify({
@@ -191,10 +202,28 @@ export class BookingsService {
         throw Errors.conflict('WALLET_REVIEW', 'La wallet necesita revisión. Revísala o marca la aprobación excepcional.');
       }
     }
+    return this.dto(
+      await this.applyApproval(b, {
+        actorId: actor.id,
+        input,
+        note: input.overrideWalletReview ? 'Aprobada con wallet en revisión (excepción)' : 'Aprobada',
+        action: 'booking.approved',
+        meta,
+      }),
+      true,
+    );
+  }
+
+  /** Pasa una solicitud PENDING a CONFIRMED (manual o automática), avisa al cliente y emite el webhook. */
+  private async applyApproval(
+    b: BookingFull,
+    opts: { actorId: string | null; input: Partial<ApproveBookingInput>; note: string; action: string; meta?: RequestMeta; metadata?: Record<string, unknown> },
+  ) {
+    const { input } = opts;
     const updated = await this.prisma.$transaction(async (tx) => {
-      const { count } = await tx.booking.updateMany({ where: { id, status: 'PENDING' }, data: { updatedAt: new Date() } });
+      const { count } = await tx.booking.updateMany({ where: { id: b.id, status: 'PENDING' }, data: { updatedAt: new Date() } });
       if (!count) throw Errors.conflict('STALE_STATE', 'La cita ha cambiado de estado. Recarga e inténtalo de nuevo.');
-      if (b.exchange) {
+      if (b.exchange && (input.agreedRate || input.fiatAmount || input.feeAmount || input.note)) {
         await tx.exchangeRequest.update({
           where: { id: b.exchange.id },
           data: {
@@ -206,30 +235,28 @@ export class BookingsService {
         });
       }
       const u = await tx.booking.update({
-        where: { id },
+        where: { id: b.id },
         data: {
           status: 'CONFIRMED',
           approvedAt: new Date(),
-          approvedById: actor.id,
-          events: {
-            create: {
-              fromStatus: 'PENDING',
-              toStatus: 'CONFIRMED',
-              actorId: actor.id,
-              note: input.overrideWalletReview ? 'Aprobada con wallet en revisión (excepción)' : 'Aprobada',
-            },
-          },
+          approvedById: opts.actorId,
+          events: { create: { fromStatus: 'PENDING', toStatus: 'CONFIRMED', actorId: opts.actorId, note: opts.note } },
         },
         include: bookingInclude,
       });
       await this.audit.log(
         {
-          actorId: actor.id,
-          action: 'booking.approved',
+          actorId: opts.actorId,
+          action: opts.action,
           entityType: 'booking',
-          entityId: id,
-          metadata: { overrideWalletReview: input.overrideWalletReview, agreedRate: input.agreedRate, fiatAmount: input.fiatAmount },
-          meta,
+          entityId: b.id,
+          metadata: {
+            overrideWalletReview: input.overrideWalletReview,
+            agreedRate: input.agreedRate,
+            fiatAmount: input.fiatAmount,
+            ...opts.metadata,
+          },
+          meta: opts.meta,
         },
         tx,
       );
@@ -237,7 +264,62 @@ export class BookingsService {
     });
     this.notifyConfirmed(updated, true);
     void this.webhooks.emit(WebhookEvent.BOOKING_CONFIRMED, webhookPayload(updated));
-    return this.dto(updated, true);
+    return updated;
+  }
+
+  /**
+   * Aprobación automática de clientes de confianza. Todas las condiciones deben cumplirse:
+   *  - activada en los ajustes de Cambio cripto
+   *  - importe dentro del máximo configurado
+   *  - identidad verificada y en vigor
+   *  - wallet auditada sin riesgos y ya usada en una operación completada
+   *  - un mínimo de operaciones completadas y ninguna transacción que no cuadrara
+   * Devuelve la cita aprobada, o null si queda pendiente de revisión manual.
+   */
+  async autoApproveIfTrusted(b: BookingFull, meta?: RequestMeta): Promise<BookingFull | null> {
+    const ex = b.exchange;
+    if (!ex || b.status !== 'PENDING') return null;
+    const s = await this.prisma.exchangeSettings.findUnique({ where: { id: 1 } });
+    const reasons = await this.autoApproveBlockers(b, s);
+    if (reasons.length) {
+      await this.audit.log({ action: 'booking.auto_approve_skipped', entityType: 'booking', entityId: b.id, metadata: { reasons } });
+      return null;
+    }
+    return this.applyApproval(b, {
+      actorId: null,
+      input: {},
+      note: 'Aprobada automáticamente (cliente de confianza)',
+      action: 'booking.auto_approved',
+      meta,
+      metadata: { automatic: true },
+    });
+  }
+
+  /** Motivos por los que una solicitud no se aprueba sola (vacío = se puede aprobar). */
+  async autoApproveBlockers(
+    b: BookingFull,
+    s: { autoApproveEnabled: boolean; autoApproveMaxAmount: Prisma.Decimal; autoApproveMinCompleted: number } | null,
+  ): Promise<string[]> {
+    const ex = b.exchange;
+    if (!ex) return ['no es una operación de cambio'];
+    if (!s?.autoApproveEnabled) return ['aprobación automática desactivada'];
+    const reasons: string[] = [];
+    if (ex.amount.gt(s.autoApproveMaxAmount)) reasons.push(`importe superior a ${s.autoApproveMaxAmount}`);
+    const kyc = b.user.kycProfile;
+    if (kyc?.status !== 'APPROVED') reasons.push('identidad no verificada');
+    else if (kyc.expiresAt && kyc.expiresAt < new Date()) reasons.push('verificación de identidad caducada');
+    if (ex.wallet.riskStatus !== 'CLEAR') reasons.push('wallet no está «sin riesgos»');
+    const [completed, walletUsed, badTx] = await Promise.all([
+      this.prisma.booking.count({ where: { userId: b.userId, status: 'COMPLETED', exchange: { isNot: null } } }),
+      this.prisma.exchangeRequest.count({ where: { walletId: ex.walletId, booking: { status: 'COMPLETED' } } }),
+      this.prisma.exchangeRequest.count({
+        where: { booking: { userId: b.userId }, txCheckStatus: { in: ['MISMATCH', 'FAILED', 'NOT_FOUND'] } },
+      }),
+    ]);
+    if (completed < s.autoApproveMinCompleted) reasons.push(`menos de ${s.autoApproveMinCompleted} operaciones completadas`);
+    if (!walletUsed) reasons.push('wallet sin operaciones completadas');
+    if (badTx) reasons.push('tiene transacciones que no cuadraron');
+    return reasons;
   }
 
   async reject(actor: Actor, id: string, reason: string, meta: RequestMeta) {
@@ -452,6 +534,15 @@ export class BookingsService {
       },
       { timeout: 15_000 },
     );
+
+    // Al reprogramar vuelve a revisión; si es un cliente de confianza se aprueba sola otra vez.
+    if (updated.status === 'PENDING' && updated.exchange) {
+      const auto = await this.autoApproveIfTrusted(updated, meta).catch(() => null);
+      if (auto) {
+        void this.webhooks.emit(WebhookEvent.BOOKING_RESCHEDULED, { ...webhookPayload(auto), previousStartsAt: existing.startsAt.toISOString() });
+        return this.dto(auto, isStaff);
+      }
+    }
 
     const when = formatDateTime(updated.startsAt.toISOString(), updated.location.timezone);
     void this.notifications.notify({

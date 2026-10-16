@@ -4,6 +4,8 @@ import {
   AvailabilityDto,
   BookingDto,
   BookingQrDto,
+  bookingSteps,
+  TrackerState,
   formatDateLong,
   formatTime,
   todayIn,
@@ -190,5 +192,35 @@ export function SlotPicker({
         )}
       </div>
     </div>
+  );
+}
+
+const TRACKER_ICON: Record<TrackerState, string> = { done: '✓', current: '•', todo: '', failed: '✕' };
+
+/** Seguimiento de la cita por pasos (solicitud → aprobación → visita → completada). */
+export function StatusTracker({ booking }: { booking: BookingDto }) {
+  const steps = bookingSteps(booking);
+  return (
+    <section className="card" aria-label="Seguimiento">
+      <h2 style={{ fontSize: 'var(--t-lg)' }}>Seguimiento</h2>
+      <ol className="tracker">
+        {steps.map((s, i) => (
+          <li key={s.key} className={s.state} aria-current={s.state === 'current' ? 'step' : undefined}>
+            <span className="dot" aria-hidden>
+              {TRACKER_ICON[s.state] || i + 1}
+            </span>
+            <div>
+              <div className="label">
+                {s.label}
+                <span className="sr-only">
+                  {s.state === 'done' ? ' (hecho)' : s.state === 'current' ? ' (en curso)' : s.state === 'failed' ? ' (no completado)' : ' (pendiente)'}
+                </span>
+              </div>
+              {s.detail ? <div className="detail" style={{ textTransform: 'none' }}>{s.detail}</div> : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

@@ -136,6 +136,24 @@ Por ubicación, desde el backoffice: puestos simultáneos, intervalo entre horas
 - Variables opcionales en `.env`: `ETHERSCAN_API_KEY` (antigüedad en redes EVM), `TRONGRID_API_KEY`, `CHAINALYSIS_SANCTIONS_API_KEY`, `RPC_*_URL`, y `SCREENING_OFFLINE=true` para desarrollo sin red.
 - El proveedor de screening es intercambiable (`ScreeningProvider`) para conectar más adelante Chainalysis KYT, Elliptic o TRM.
 
+### Aprobación automática, seguimiento y guía de red
+
+- **Aprobación automática** (Backoffice → Cambio cripto, desactivada por defecto). Una solicitud se aprueba sola si se cumple todo:
+  - identidad verificada y en vigor;
+  - wallet «sin riesgos» y ya usada en una operación completada;
+  - un mínimo de operaciones completadas;
+  - ninguna transacción que no cuadrara;
+  - importe hasta el máximo configurado.
+
+  Si falta algo, llega a Solicitudes con el motivo. Las aprobadas así se marcan «Aprobada automáticamente» y quedan en la auditoría.
+- **Seguimiento por pasos** en la web y la app: Solicitud enviada → Revisión y aprobación → Visita en la oficina → Operación completada, con fechas y motivos de rechazo o cancelación. La lógica está en `packages/shared/src/tracker.ts`.
+- **Guía de red** al pedir el cambio y en la cita:
+  - qué red elegir en la wallet y con qué moneda se paga la comisión;
+  - aviso de que las direcciones 0x son iguales en Ethereum, Polygon y BNB Chain;
+  - aviso de USDC en TRON.
+
+  El cliente debe confirmar que su wallet usa esa red antes de continuar.
+
 ### OpenScan y verificación de transacciones
 
 - **Backoffice → Operaciones** lista todas las peticiones con wallet, vengan de la web o de la app (columna *Canal*), con filtros por estado de la wallet, de la transacción, red y canal. **Revisar** despliega la solicitud, la verificación de la transacción y la actividad de la wallet en OpenScan.
