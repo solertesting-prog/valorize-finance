@@ -136,6 +136,18 @@ Por ubicación, desde el backoffice: puestos simultáneos, intervalo entre horas
 - Variables opcionales en `.env`: `ETHERSCAN_API_KEY` (antigüedad en redes EVM), `TRONGRID_API_KEY`, `CHAINALYSIS_SANCTIONS_API_KEY`, `RPC_*_URL`, y `SCREENING_OFFLINE=true` para desarrollo sin red.
 - El proveedor de screening es intercambiable (`ScreeningProvider`) para conectar más adelante Chainalysis KYT, Elliptic o TRM.
 
+### Cotización, justificante e historial
+
+- **Cotización orientativa:**
+  - el tipo medio es el precio de mercado en EUR (CoinGecko, en caché 2 min) o un tipo manual (Backoffice → Cambio cripto); si el precio de mercado no está disponible, se usa el manual;
+  - al tipo medio se le aplica un margen distinto para venta y compra, y una comisión fija opcional;
+  - el redondeo a céntimos es a favor de la casa.
+- **Dónde se ve:** en el simulador de la portada, al pedir el cambio (web y app) y en los ajustes como vista previa. Se guarda en cada solicitud (`quotedRate`, `quotedFiatAmount`) y la oficina parte de ella al aprobar. Endpoint público: `GET /v1/exchange/quote?direction&asset&amount`.
+- **Justificante en PDF** de cada operación completada:
+  - generado sin dependencias (`src/common/pdf.ts`) y descargado con un enlace firmado de 5 minutos, que sirve igual en la web, la app y el backoffice;
+  - incluye un código de verificación que cualquiera puede comprobar en `/justificante`.
+- **Historial de operaciones** del cliente (web `/app/operaciones`, app «Mis operaciones»), con los totales del año y los justificantes.
+
 ### Aprobación automática, seguimiento y guía de red
 
 - **Aprobación automática** (Backoffice → Cambio cripto, desactivada por defecto). Una solicitud se aprueba sola si se cumple todo:

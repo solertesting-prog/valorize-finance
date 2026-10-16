@@ -7,6 +7,7 @@ import { RequestMeta } from '../common/auth.decorators';
 import { Errors } from '../common/errors';
 import { PrismaService } from '../common/prisma.service';
 import { parseAddress } from './address';
+import { readManual } from '../bookings/rates.service';
 import { WalletScreeningService } from './screening.service';
 
 /** Listas OFAC de direcciones por activo, mantenidas a diario a partir del SDN oficial. */
@@ -290,6 +291,11 @@ export class WalletsService {
             autoApproveEnabled: s.autoApproveEnabled,
             autoApproveMaxAmount: s.autoApproveMaxAmount.toString(),
             autoApproveMinCompleted: s.autoApproveMinCompleted,
+            rateSource: s.rateSource === 'MANUAL' ? ('MANUAL' as const) : ('AUTO' as const),
+            manualRates: readManual(s.manualRates),
+            sellSpreadPct: s.sellSpreadPct.toString(),
+            buySpreadPct: s.buySpreadPct.toString(),
+            fixedFeeEur: s.fixedFeeEur.toFixed(2),
           }
         : {}),
     };
@@ -307,7 +313,14 @@ export class WalletsService {
       if (bad) throw Errors.unprocessable('INVALID_ADDRESS', `${bad.display}: ${bad.error}`);
       if (parsed.length) receiving[n] = [...new Set(parsed.map((p) => p.display))];
     }
-    const data = { ...input, receivingAddresses: receiving as Prisma.InputJsonValue };
+    if (input.rateSource === 'MANUAL' && !Object.keys(input.manualRates ?? {}).length) {
+      throw Errors.unprocessable('RATE_REQUIRED', 'Con la cotización manual tienes que indicar el tipo de USDT y USDC');
+    }
+    const data = {
+      ...input,
+      receivingAddresses: receiving as Prisma.InputJsonValue,
+      manualRates: (input.manualRates ?? {}) as Prisma.InputJsonValue,
+    };
     await this.prisma.exchangeSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
     await this.audit.log({ actorId, action: 'exchange.settings_updated', entityType: 'exchange_settings', entityId: '1', metadata: input, meta });
     return this.settings(true);

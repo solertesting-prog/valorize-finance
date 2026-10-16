@@ -32,6 +32,11 @@ export default function BookingScreen() {
     Alert.alert(msg);
   };
   const reschedule = useMutation({ mutationFn: () => api.post<BookingDto>(`/me/bookings/${id}/reschedule`, { startsAt }), onSuccess: (nb) => after(nb.status === 'PENDING' ? 'Cita cambiada. La revisaremos de nuevo.' : 'Cita cambiada. Tu QR se ha actualizado.')(nb) });
+  // Enlace firmado de 5 minutos: se abre en el navegador del móvil, que descarga o muestra el PDF.
+  const receipt = useMutation({
+    mutationFn: () => api.post<{ url: string }>(`/me/bookings/${id}/receipt-link`),
+    onSuccess: (r) => void Linking.openURL(r.url),
+  });
   const cancel = useMutation({ mutationFn: () => api.post<BookingDto>(`/me/bookings/${id}/cancel`, { reason: reason || undefined }), onSuccess: after('Cita cancelada') });
 
   if (q.isLoading) return <Loader />;
@@ -52,6 +57,15 @@ export default function BookingScreen() {
         <Card>
           <H2>Tu operación</H2>
           <ExchangeSummary ex={b.exchange} />
+          {b.status === 'COMPLETED' ? (
+            <Button
+              title="Descargar justificante (PDF)"
+              size="sm"
+              loading={receipt.isPending}
+              onPress={() => receipt.mutate()}
+            />
+          ) : null}
+          {receipt.error ? <Notice kind="error">{errorMessage(receipt.error)}</Notice> : null}
           {['PENDING', 'CONFIRMED'].includes(b.status) ? (
             <NetworkGuideBox network={b.exchange.network} asset={b.exchange.asset} direction={b.exchange.direction}>
               {b.exchange.direction === 'SELL_CRYPTO' ? (

@@ -72,6 +72,7 @@ export default function RootLayout() {
             <Stack.Screen name="booking/[id]" options={{ title: 'Mi QR' }} />
             <Stack.Screen name="notifications" options={{ title: 'Notificaciones' }} />
             <Stack.Screen name="kyc" options={{ title: 'Verificación' }} />
+            <Stack.Screen name="operations" options={{ title: 'Mis operaciones' }} />
             <Stack.Screen name="security" options={{ title: 'Seguridad' }} />
           </Stack>
         </AuthProvider>

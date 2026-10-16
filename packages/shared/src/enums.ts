@@ -277,11 +277,18 @@ export const NETWORK_GUIDE: Record<ChainNetwork, NetworkGuide> = {
   BSC: { standard: 'BEP-20', pickInWallet: '«BNB Smart Chain (BEP20)»', feeCoin: 'BNB', addressStartsWith: '0x' },
 };
 
+/** Nombre de la red con su estándar, sin repetirlo: «TRON (TRC-20)», «Polygon (Polygon PoS)». */
+export function networkFullName(network: ChainNetwork): string {
+  const label = NETWORK_LABEL[network];
+  const std = NETWORK_GUIDE[network].standard;
+  return label.includes(std) ? label : `${label} (${std})`;
+}
+
 /** Consejos para no perder fondos al enviar o recibir por una red concreta. */
 export function networkTips(network: ChainNetwork, asset: CryptoAsset, direction: ExchangeDirection): string[] {
   const g = NETWORK_GUIDE[network];
   const tips = [
-    `En tu wallet o exchange elige la red ${g.pickInWallet}: ${asset} en ${NETWORK_LABEL[network]} (${g.standard}).`,
+    `En tu wallet o exchange elige la red ${g.pickInWallet}: ${asset} en ${networkFullName(network)}.`,
     direction === 'SELL_CRYPTO'
       ? `Para enviar necesitarás un poco de ${g.feeCoin} en la wallet para pagar la comisión de red.`
       : `Comprueba que tu wallet muestra ${asset} en ${NETWORK_LABEL[network]}; si no aparece, añade el token antes de la cita.`,

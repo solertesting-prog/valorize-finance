@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { QrPass, SlotPicker, StatusTracker } from '@/components/booking';
-import { ExchangeSummary, NetworkGuideBox } from '@/components/exchange';
+import { ExchangeSummary, NetworkGuideBox, ReceiptButton } from '@/components/exchange';
 import { Alert, Button, ErrorBox, Modal, Spinner, TextInput, useToast } from '@/components/ui';
 import { api, authFetch } from '@/lib/api';
 
@@ -79,6 +79,7 @@ function BookingDetail() {
         <div className="card stack">
           <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Tu operación</h2>
           <ExchangeSummary ex={b.exchange} />
+          {b.status === 'COMPLETED' ? <ReceiptButton path={`/me/bookings/${b.id}/receipt-link`} /> : null}
           {['PENDING', 'CONFIRMED'].includes(b.status) ? (
             <NetworkGuideBox network={b.exchange.network} asset={b.exchange.asset} direction={b.exchange.direction}>
               {b.exchange.direction === 'SELL_CRYPTO' ? (

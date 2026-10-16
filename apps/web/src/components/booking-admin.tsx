@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { SlotPicker } from './booking';
-import { ExchangeSummary } from './exchange';
+import { ExchangeSummary, ReceiptButton } from './exchange';
 import { OpenScanViewer, TxCheckPanel } from './openscan';
 import { useTransition } from './staff';
 import { Alert, Button, ErrorBox, KycBadge, Modal, Spinner, StatusBadge, TextInput, useToast } from './ui';
@@ -109,6 +109,7 @@ export function BookingAdminView({ id, basePath, apiBase }: { id: string; basePa
               <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
                 <TxCheckPanel booking={b} />
               </div>
+              {b.status === 'COMPLETED' ? <ReceiptButton path={`/staff/bookings/${b.id}/receipt-link`} size="sm" /> : null}
             </section>
           ) : null}
 

@@ -99,6 +99,12 @@ export class StaffController {
     return this.bookings.updateExchangeSettlement(u, id, b, meta);
   }
 
+  /** Enlace de descarga del justificante en PDF (válido 5 minutos). */
+  @Post('bookings/:id/receipt-link')
+  receiptLink(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.bookings.receiptLink(u, id);
+  }
+
   /** Vuelve a comprobar en la blockchain la transacción registrada. */
   @Post('bookings/:id/exchange/verify-tx')
   verifyTx(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {

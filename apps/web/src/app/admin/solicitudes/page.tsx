@@ -7,6 +7,7 @@ import {
   CHANNEL_LABEL,
   errorMessage,
   formatDateLong,
+  formatEur,
   formatTime,
   fullName,
   LocationDto,
@@ -138,7 +139,8 @@ function ApproveModal({ item, onClose }: { item: PendingApprovalDto; onClose: ()
   const b = item.booking;
   const ex = b.exchange;
   const risk = ex?.wallet.riskStatus;
-  const [f, setF] = useState({ agreedRate: '', fiatAmount: '', feeAmount: '', note: '', override: false });
+  // Se parte de la cotización que vio el cliente; la oficina la ajusta si hace falta.
+  const [f, setF] = useState({ agreedRate: ex?.quotedRate ?? '', fiatAmount: '', feeAmount: '', note: '', override: false });
   const fiat = f.agreedRate && ex ? (Number(ex.amount) * Number(f.agreedRate.replace(',', '.'))).toFixed(2) : '';
 
   const m = useMutation({
@@ -188,6 +190,7 @@ function ApproveModal({ item, onClose }: { item: PendingApprovalDto; onClose: ()
           <>
             <p className="small muted" style={{ margin: 0 }}>
               Condiciones acordadas (opcionales). El cliente las verá en su cita.
+              {ex.quotedFiatAmount ? ` Al pedirla se le mostró ${formatEur(ex.quotedFiatAmount)} (tipo ${ex.quotedRate}).` : ''}
             </p>
             <div className="grid" style={{ '--min': '140px' } as React.CSSProperties}>
               <TextInput label="Tipo (EUR por unidad)" inputMode="decimal" value={f.agreedRate} onChange={(e) => setF({ ...f, agreedRate: e.target.value })} placeholder="0,92" />

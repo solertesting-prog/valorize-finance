@@ -48,6 +48,8 @@ function exchangeDto(e: NonNullable<BookingFull['exchange']>, staff: boolean): E
     agreedRate: e.agreedRate?.toString() ?? null,
     fiatAmount: e.fiatAmount?.toString() ?? null,
     feeAmount: e.feeAmount?.toString() ?? null,
+    quotedRate: e.quotedRate?.toString() ?? null,
+    quotedFiatAmount: e.quotedFiatAmount?.toString() ?? null,
     txHash: e.txHash,
     internalNote: staff ? e.internalNote : undefined,
     txCheck: staff ? ((e.txCheck as unknown as TxCheckDto | null) ?? null) : undefined,

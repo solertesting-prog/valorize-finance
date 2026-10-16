@@ -33,6 +33,9 @@ import { MeController } from './users/me.controller';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { ExchangeService } from './bookings/exchange.service';
 import { TxVerificationService } from './bookings/tx-verification.service';
+import { RatesService } from './bookings/rates.service';
+import { ReceiptService } from './bookings/receipt.service';
+import { ReceiptsController } from './bookings/receipts.controller';
 import { OnchainService } from './wallets/onchain.service';
 import { WalletScreeningService } from './wallets/screening.service';
 import { AdminWalletsController, WalletsController } from './wallets/wallets.controller';
@@ -71,6 +74,7 @@ import { WalletsService } from './wallets/wallets.service';
     AuthModule,
   ],
   controllers: [
+    ReceiptsController,
     HealthController,
     MeController,
     FilesController,
@@ -104,6 +108,8 @@ import { WalletsService } from './wallets/wallets.service';
     WalletsService,
     ExchangeService,
     TxVerificationService,
+    RatesService,
+    ReceiptService,
   ],
 })
 export class AppModule {}

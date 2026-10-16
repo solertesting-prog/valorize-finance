@@ -36,6 +36,7 @@ export default function Bookings() {
             <Row>
               <Button title="Próximas" size="sm" variant={scope === 'upcoming' ? 'primary' : 'default'} onPress={() => setScope('upcoming')} />
               <Button title="Historial" size="sm" variant={scope === 'past' ? 'primary' : 'default'} onPress={() => setScope('past')} />
+              <Button title="Mis operaciones" size="sm" variant="ghost" onPress={() => router.push('/operations')} />
             </Row>
           </View>
         }

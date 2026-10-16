@@ -19,6 +19,7 @@ const CUSTOMER_NAV = [
   { href: '/app', label: 'Inicio', icon: 'home', exact: true },
   { href: '/app/ubicaciones', label: 'Ubicaciones', icon: 'pin' },
   { href: '/app/reservas', label: 'Mis citas', icon: 'qr' },
+  { href: '/app/operaciones', label: 'Operaciones', icon: 'wallet' },
   { href: '/app/perfil', label: 'Perfil', icon: 'user' },
 ];
 

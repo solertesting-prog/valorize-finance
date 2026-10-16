@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BookingStatus, NotificationType, Prisma, Role } from '@prisma/client';
-import type { AdminExchangeQuery, ApproveBookingInput, BookingDto, BookingEventDto, BookingQrDto, CreateBookingInput, ScanResultDto } from '@valorize/shared';
+import type { AdminExchangeQuery, ApproveBookingInput, BookingDto, BookingEventDto, BookingQrDto, CreateBookingInput, MyExchangesDto, ScanResultDto } from '@valorize/shared';
 import { ACTIVE_BOOKING_STATUSES, BOOKING_TRANSITIONS, formatDateTime, WebhookEvent } from '@valorize/shared';
 import { DateTime } from 'luxon';
 import { AuditService } from '../common/audit.service';
@@ -16,6 +16,7 @@ import { ExchangeService } from './exchange.service';
 import { QrService } from './qr.service';
 import { TxVerificationService } from './tx-verification.service';
 import { KycService } from '../kyc/kyc.service';
+import { ReceiptService } from './receipt.service';
 
 export interface Actor {
   id: string;
@@ -47,6 +48,7 @@ export class BookingsService {
     private readonly exchange: ExchangeService,
     private readonly txVerification: TxVerificationService,
     private readonly kyc: KycService,
+    private readonly receipts: ReceiptService,
     @Inject(ENV) private readonly env: Env,
   ) {
     this.rules = { cancelCutoffMin: env.CANCEL_CUTOFF_MIN, maxReschedules: env.MAX_RESCHEDULES };
@@ -387,6 +389,15 @@ export class BookingsService {
     return this.dto(await this.findAny(id), true);
   }
 
+  /** Enlace de descarga del justificante (cliente: solo sus citas; personal: las de sus oficinas). */
+  async receiptLink(actor: Actor, id: string) {
+    const b = actor.role === 'CUSTOMER' ? await this.findOwned(actor.id, id) : await this.findAny(id);
+    if (actor.role !== 'CUSTOMER') await this.assertStaffLocation(actor, b.locationId);
+    if (!b.exchange) throw Errors.unprocessable('NOT_EXCHANGE', 'Solo las operaciones de cambio tienen justificante');
+    if (b.status !== 'COMPLETED') throw Errors.conflict('NOT_COMPLETED', 'El justificante estará disponible cuando la operación se complete en la oficina');
+    return this.receipts.link(b.id);
+  }
+
   /** Vuelve a comprobar en la blockchain la transacción de una operación. */
   async verifyExchangeTx(actor: Actor, id: string) {
     const b = await this.findAny(id);
@@ -449,6 +460,34 @@ export class BookingsService {
       this.prisma.booking.count({ where }),
     ]);
     return { items: items.map((b) => this.dto(b)), total, page, pageSize };
+  }
+
+  /** Historial de operaciones de cambio del cliente, con totales del año en curso. */
+  async myExchanges(userId: string, page: number, pageSize: number): Promise<MyExchangesDto> {
+    const where: Prisma.BookingWhereInput = { userId, exchange: { isNot: null } };
+    const year = DateTime.now().setZone('Europe/Madrid').year;
+    const from = DateTime.fromObject({ year, month: 1, day: 1 }, { zone: 'Europe/Madrid' }).toJSDate();
+    const to = DateTime.fromObject({ year: year + 1, month: 1, day: 1 }, { zone: 'Europe/Madrid' }).toJSDate();
+    const done = { booking: { userId, status: 'COMPLETED' as const, completedAt: { gte: from, lt: to } } };
+    const [items, total, sold, bought, completed] = await this.prisma.$transaction([
+      this.prisma.booking.findMany({ where, include: bookingInclude, orderBy: { startsAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize }),
+      this.prisma.booking.count({ where }),
+      this.prisma.exchangeRequest.aggregate({ _sum: { fiatAmount: true }, where: { ...done, direction: 'SELL_CRYPTO' } }),
+      this.prisma.exchangeRequest.aggregate({ _sum: { fiatAmount: true }, where: { ...done, direction: 'BUY_CRYPTO' } }),
+      this.prisma.exchangeRequest.count({ where: done }),
+    ]);
+    return {
+      items: items.map((b) => this.dto(b)),
+      total,
+      page,
+      pageSize,
+      totals: {
+        year,
+        completed,
+        soldEur: (sold._sum.fiatAmount ?? new Prisma.Decimal(0)).toFixed(2),
+        boughtEur: (bought._sum.fiatAmount ?? new Prisma.Decimal(0)).toFixed(2),
+      },
+    };
   }
 
   async getForUser(userId: string, id: string): Promise<BookingDto> {

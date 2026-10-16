@@ -6,6 +6,7 @@ import {
   cancelBookingSchema,
   createBookingSchema,
   isoDate,
+  paginationSchema,
   rescheduleBookingSchema,
   uuid,
 } from '@valorize/shared';
@@ -55,6 +56,13 @@ export class BookingsController {
     return this.bookings.listForUser(u.id, q.scope, q.page, q.pageSize);
   }
 
+  /** Historial de operaciones de cambio con los totales del año. */
+  @ApiBearerAuth()
+  @Get('me/exchanges')
+  myExchanges(@CurrentUser() u: AuthUser, @Query(new ZodPipe(paginationSchema)) q: z.infer<typeof paginationSchema>) {
+    return this.bookings.myExchanges(u.id, q.page, q.pageSize);
+  }
+
   @ApiBearerAuth()
   @Get('me/bookings/:id')
   get(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
@@ -66,6 +74,14 @@ export class BookingsController {
   @Header('Cache-Control', 'no-store')
   qr(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.qrForUser(u.id, id);
+  }
+
+  /** Enlace de descarga del justificante en PDF (válido 5 minutos). */
+  @ApiBearerAuth()
+  @Post('me/bookings/:id/receipt-link')
+  @Header('Cache-Control', 'no-store')
+  receiptLink(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.bookings.receiptLink(u, id);
   }
 
   @ApiBearerAuth()

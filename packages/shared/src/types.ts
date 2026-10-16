@@ -373,6 +373,9 @@ export interface ExchangeDto {
   agreedRate: string | null;
   fiatAmount: string | null;
   feeAmount: string | null;
+  /** Cotización orientativa que vio el cliente al enviar la solicitud. */
+  quotedRate: string | null;
+  quotedFiatAmount: string | null;
   txHash: string | null;
   /** Solo visible para personal. */
   internalNote?: string | null;
@@ -456,6 +459,12 @@ export interface ExchangeSettingsDto {
   autoApproveEnabled?: boolean;
   autoApproveMaxAmount?: string;
   autoApproveMinCompleted?: number;
+  /** Cotización (solo backoffice). */
+  rateSource?: 'AUTO' | 'MANUAL';
+  manualRates?: Partial<Record<CryptoAsset, string>>;
+  sellSpreadPct?: string;
+  buySpreadPct?: string;
+  fixedFeeEur?: string;
   /** Instancia de OpenScan para revisar wallets y transacciones. */
   openscanUrl: string;
   /** Direcciones propias de Valorize por red (solo backoffice). */
@@ -467,4 +476,27 @@ export interface PendingApprovalDto {
   screening: WalletScreeningDto | null;
   /** Motivos por los que no se aprobó automáticamente. */
   autoApproveBlockers?: string[];
+}
+
+/** Cotización orientativa de una operación. El precio final se fija en la oficina. */
+export interface QuoteDto {
+  direction: ExchangeDirection;
+  asset: CryptoAsset;
+  amount: string;
+  /** Tipo medio de mercado (EUR por unidad). */
+  midRate: string;
+  /** Tipo aplicado al cliente, ya con el margen (EUR por unidad). */
+  rate: string;
+  spreadPct: string;
+  /** Comisión fija (EUR). */
+  fee: string;
+  /** Lo que recibe (venta) o paga (compra) el cliente, en EUR. */
+  fiatAmount: string;
+  source: 'AUTO' | 'MANUAL';
+  updatedAt: string;
+}
+
+/** Operaciones de cambio del cliente con totales. */
+export interface MyExchangesDto extends Paginated<BookingDto> {
+  totals: { completed: number; soldEur: string; boughtEur: string; year: number };
 }

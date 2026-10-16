@@ -7,14 +7,18 @@ import {
   ExchangeDto,
   ExchangeSettingsDto,
   explorerLinks,
-  NETWORK_GUIDE,
+  formatEur,
+  formatNum,
+  QuoteDto,
   NETWORK_LABEL,
+  networkFullName,
   networkTips,
   walletAddressShape,
   WalletDto,
 } from '@valorize/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type React from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { api } from '../lib/api';
 import { c, f, r, t } from '../theme';
@@ -179,6 +183,8 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
         style={{ fontFamily: f.brand, fontSize: t.xl }}
       />
 
+      <QuoteBox direction={value.direction} asset={value.asset} amount={value.amount} />
+
       <View style={{ gap: 8 }}>
         <Label>{value.direction === 'SELL_CRYPTO' ? `Wallet desde la que enviarás los ${value.asset}` : `Wallet en la que recibirás los ${value.asset}`}</Label>
         {wallets.data?.map((w: WalletDto) => (
@@ -206,6 +212,39 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
   );
 }
 
+/** Cotización orientativa mientras el cliente escribe el importe. */
+export function QuoteBox({ direction, asset, amount }: { direction: ExchangeDirection; asset: CryptoAsset; amount: string }) {
+  const [a, setA] = useState(amount);
+  useEffect(() => {
+    const t = setTimeout(() => setA(amount.replace(',', '.').trim()), 350);
+    return () => clearTimeout(t);
+  }, [amount]);
+  const valid = /^\d{1,12}(\.\d{1,6})?$/.test(a) && Number(a) > 0;
+  const q = useQuery({
+    queryKey: ['quote', direction, asset, a],
+    queryFn: () => api.get<QuoteDto>('/exchange/quote', { query: { direction, asset, amount: a } }),
+    enabled: valid,
+    staleTime: 60_000,
+    retry: 1,
+  });
+  if (!amount.trim()) return null;
+  if (q.isError) return <Muted style={{ fontSize: t.sm }}>Ahora mismo no podemos calcular la cotización. Te la daremos en la oficina.</Muted>;
+  const d = q.data;
+  return (
+    <View style={{ borderWidth: 1, borderColor: c.line, borderRadius: r.md, padding: 14, backgroundColor: c.slate2, gap: 2 }} accessibilityLiveRegion="polite">
+      <Text style={{ color: c.fog, fontFamily: f.ui, fontSize: t.xs }}>{direction === 'SELL_CRYPTO' ? 'Recibirás aproximadamente' : 'Pagarás aproximadamente'}</Text>
+      <Text style={{ color: c.mint, fontFamily: f.brand, fontSize: t.x2 }}>{d ? formatEur(d.fiatAmount) : '…'}</Text>
+      {d ? (
+        <Text style={{ color: c.fog, fontFamily: f.ui, fontSize: t.xs }}>
+          Tipo {formatNum(d.rate, 4)} € por {d.asset}
+          {Number(d.fee) > 0 ? ` · comisión ${formatEur(d.fee)}` : ''}
+        </Text>
+      ) : null}
+      <Text style={{ color: c.fog, fontFamily: f.ui, fontSize: t.xs, marginTop: 4 }}>Orientativo: el importe final se confirma en la oficina.</Text>
+    </View>
+  );
+}
+
 /** Guía para no equivocarse de red al enviar o recibir. */
 export function NetworkGuideBox({
   network,
@@ -221,7 +260,7 @@ export function NetworkGuideBox({
   return (
     <View style={{ backgroundColor: c.skySoft, borderColor: c.sky, borderWidth: 1, borderRadius: r.sm, padding: 12, gap: 6 }} accessibilityRole="summary">
       <Text style={{ color: c.paper, fontFamily: f.uiBold, fontSize: t.sm }}>
-        Red {NETWORK_LABEL[network]} · {NETWORK_GUIDE[network].standard}
+        Red {networkFullName(network)}
       </Text>
       {networkTips(network, asset, direction).map((tip) => (
         <Text key={tip} style={{ color: c.paper, fontFamily: f.ui, fontSize: t.sm, lineHeight: t.sm * 1.45 }}>
@@ -253,7 +292,8 @@ export function ExchangeSummary({ ex }: { ex: ExchangeDto }) {
       <Item label="Operación" value={DIRECTION_SHORT[ex.direction]} />
       <Item label="Importe" value={`${ex.amount} ${ex.asset}`} mono />
       <Item label="Red" value={NETWORK_LABEL[ex.network]} />
-      {ex.fiatAmount ? <Item label="Importe en euros" value={`${ex.fiatAmount} €${ex.agreedRate ? ` (a ${ex.agreedRate})` : ''}`} /> : null}
+      {ex.fiatAmount ? <Item label="Importe en euros" value={`${formatEur(ex.fiatAmount)}${ex.agreedRate ? ` (a ${ex.agreedRate})` : ''}`} /> : null}
+      {!ex.fiatAmount && ex.quotedFiatAmount ? <Item label="Estimación (orientativa)" value={formatEur(ex.quotedFiatAmount)} /> : null}
       <Item label={`Wallet${ex.wallet.label ? ` · ${ex.wallet.label}` : ''}`} value={ex.wallet.address} mono wide />
       {ex.txHash ? (
         <Pressable accessibilityRole="link" onPress={() => tx && Linking.openURL(tx.openscan ?? tx.native)} style={{ width: '100%', paddingVertical: 6 }}>

@@ -8,9 +8,11 @@ import {
   ExchangeDirection,
   ExchangeDto,
   ExchangeSettingsDto,
+  errorMessage,
   explorerLinks,
-  NETWORK_GUIDE,
+  formatEur,
   NETWORK_LABEL,
+  networkFullName,
   networkTips,
   ScreeningCheckDto,
   WALLET_RISK_LABEL,
@@ -21,8 +23,10 @@ import {
 } from '@valorize/shared';
 import { useQuery } from '@tanstack/react-query';
 import type React from 'react';
+import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { api } from '@/lib/api';
+import { QuoteBox } from './quote';
 import { Spinner } from './ui';
 
 export interface ExchangeDraft {
@@ -158,6 +162,8 @@ export function ExchangeForm({ value, onChange }: { value: ExchangeDraft; onChan
         </span>
       </div>
 
+      <QuoteBox direction={value.direction} asset={value.asset} amount={value.amount} />
+
       <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0, '--gap': '8px' } as CSSProperties}>
         <legend className="small" style={{ fontWeight: 600, marginBottom: 8 }}>
           {walletPrompt}
@@ -221,7 +227,7 @@ export function NetworkGuideBox({
   return (
     <div className="alert info" role="note">
       <strong className="small">
-        Red {NETWORK_LABEL[network]} · {NETWORK_GUIDE[network].standard}
+        Red {networkFullName(network)}
       </strong>
       <ul className="small" style={{ margin: '6px 0 0', paddingLeft: 18 }}>
         {networkTips(network, asset, direction).map((t) => (
@@ -270,6 +276,14 @@ export function ExchangeSummary({ ex, staff = false }: { ex: ExchangeDto; staff?
         <dt className="xs muted">Red</dt>
         <dd style={{ margin: 0 }}>{NETWORK_LABEL[ex.network]}</dd>
       </div>
+      {!ex.fiatAmount && ex.quotedFiatAmount ? (
+        <div>
+          <dt className="xs muted">Estimación al pedirla</dt>
+          <dd className="mono" style={{ margin: 0 }}>
+            {formatEur(ex.quotedFiatAmount)} <span className="xs muted">(orientativa)</span>
+          </dd>
+        </div>
+      ) : null}
       {ex.fiatAmount ? (
         <div>
           <dt className="xs muted">Importe en euros</dt>
@@ -369,6 +383,35 @@ export function ScreeningHeader({ screening }: { screening: WalletScreeningDto }
         ) : null}
       </div>
       <span className="xs muted">{new Date(screening.createdAt).toLocaleString('es-ES')}</span>
+    </div>
+  );
+}
+
+/** Descarga del justificante en PDF mediante un enlace firmado de corta duración. */
+export function ReceiptButton({ path, size }: { path: string; size?: 'sm' }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function download() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.post<{ url: string }>(path);
+      window.location.href = r.url;
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="stack" style={{ '--gap': '6px' } as CSSProperties}>
+      <div>
+        <button type="button" className={`btn ${size ?? ''}`} onClick={download} disabled={busy} aria-busy={busy || undefined}>
+          {busy ? <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} aria-hidden /> : null}
+          Descargar justificante (PDF)
+        </button>
+      </div>
+      {error ? <span className="small" style={{ color: 'var(--coral)' }}>{error}</span> : null}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Errors } from '../common/errors';
 import { PrismaService } from '../common/prisma.service';
 import { WalletScreeningService } from '../wallets/screening.service';
 import { WalletsService } from '../wallets/wallets.service';
+import { RatesService } from './rates.service';
 
 /** Estados que cuentan para los límites de importe (todo lo que no se ha caído). */
 const COUNTED = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE', 'COMPLETED'] as const;
@@ -19,6 +20,9 @@ export interface PreparedExchange {
   network: ExchangeInput['network'];
   amount: string;
   walletId: string;
+  quotedRate?: string;
+  quotedFiatAmount?: string;
+  quotedAt?: Date;
 }
 
 /**
@@ -35,6 +39,7 @@ export class ExchangeService {
     private readonly wallets: WalletsService,
     private readonly screening: WalletScreeningService,
     private readonly audit: AuditService,
+    private readonly rates: RatesService,
   ) {}
 
   /** Validación y auditoría de wallet. Se hace fuera de la transacción porque consulta la blockchain. */
@@ -88,7 +93,16 @@ export class ExchangeService {
       throw Errors.unprocessable('WALLET_NOT_ACCEPTED', 'No podemos operar con esta wallet. Usa otra o contacta con nosotros.');
     }
 
-    return { direction: input.direction, asset: input.asset, network: input.network, amount: amount.toString(), walletId: wallet.id };
+    // Cotización orientativa que ve el cliente: se guarda para que la oficina parta de ella al aprobar.
+    const quote = await this.rates.quote(input.direction, input.asset, amount.toString()).catch(() => null);
+    return {
+      direction: input.direction,
+      asset: input.asset,
+      network: input.network,
+      amount: amount.toString(),
+      walletId: wallet.id,
+      ...(quote ? { quotedRate: quote.rate, quotedFiatAmount: quote.fiatAmount, quotedAt: new Date() } : {}),
+    };
   }
 
   /** Límites diario y mensual. Se comprueban dentro de la transacción de la reserva. */

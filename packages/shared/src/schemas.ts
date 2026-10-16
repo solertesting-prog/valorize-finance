@@ -394,6 +394,13 @@ export const exchangeSettingsSchema = z.object({
   autoApproveEnabled: z.boolean().default(false),
   autoApproveMaxAmount: amountString.default('1000'),
   autoApproveMinCompleted: z.number().int().min(1).max(100).default(2),
+  rateSource: z.enum(['AUTO', 'MANUAL']).default('AUTO'),
+  manualRates: z
+    .object({ USDT: z.string().trim().regex(/^\d{1,4}(\.\d{1,8})?$/, 'Tipo no válido').optional(), USDC: z.string().trim().regex(/^\d{1,4}(\.\d{1,8})?$/, 'Tipo no válido').optional() })
+    .default({}),
+  sellSpreadPct: z.coerce.number().min(0).max(20).default(1.5),
+  buySpreadPct: z.coerce.number().min(0).max(20).default(1.5),
+  fixedFeeEur: z.coerce.number().min(0).max(1000).default(0),
   /** Direcciones propias de Valorize por red: se usan para comprobar la contraparte de cada transacción. */
   receivingAddresses: z
     .object({
@@ -441,3 +448,10 @@ export const adminExchangeQuerySchema = paginationSchema.extend({
   locationId: z.string().uuid().optional(),
 });
 export type AdminExchangeQuery = z.infer<typeof adminExchangeQuerySchema>;
+
+export const quoteQuerySchema = z.object({
+  direction: z.enum(values(ExchangeDirection)),
+  asset: z.enum(values(CryptoAsset)),
+  amount: amountString,
+});
+export type QuoteQuery = z.infer<typeof quoteQuerySchema>;

@@ -331,6 +331,25 @@ export class KycService {
     }
   }
 
+  /** Nombre legal y documento enmascarado para el justificante (sin registrar consulta: lo pide el propio cliente o la oficina). */
+  async receiptIdentity(userId: string): Promise<{ legalName: string | null; document: string | null }> {
+    const profile = await this.prisma.kycProfile.findUnique({ where: { userId }, include: { values: { include: { requirement: true } } } });
+    const read = (key: string) => {
+      const v = profile?.values.find((x) => x.requirement.key === key)?.valueEnc;
+      try {
+        return v ? this.crypto.decrypt(v) : null;
+      } catch {
+        return null;
+      }
+    };
+    const number = read(DOC.number);
+    const type = read(DOC.type);
+    return {
+      legalName: read(DOC.legalName),
+      document: number ? `${type ? `${type} ` : ''}•••• ${number.replace(/\s/g, '').slice(-4)}` : null,
+    };
+  }
+
   /**
    * Datos de identidad para cotejar en el mostrador al leer el QR.
    * Número de documento enmascarado; el acceso queda registrado.

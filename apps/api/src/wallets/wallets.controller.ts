@@ -5,6 +5,7 @@ import {
   ChainNetwork,
   exchangeSettingsSchema,
   paginationSchema,
+  quoteQuerySchema,
   walletInputSchema,
   walletListQuerySchema,
   walletReviewSchema,
@@ -15,6 +16,7 @@ import { Errors } from '../common/errors';
 import { ZodPipe } from '../common/zod-validation.pipe';
 import { WalletScreeningService } from './screening.service';
 import { WalletsService } from './wallets.service';
+import { RatesService } from '../bookings/rates.service';
 
 const networkQuery = z.object({
   network: z.enum(Object.values(ChainNetwork) as [ChainNetwork, ...ChainNetwork[]]).optional(),
@@ -23,7 +25,17 @@ const networkQuery = z.object({
 @ApiTags('wallets')
 @Controller()
 export class WalletsController {
-  constructor(private readonly wallets: WalletsService) {}
+  constructor(
+    private readonly wallets: WalletsService,
+    private readonly rates: RatesService,
+  ) {}
+
+  /** Cotización orientativa (simulador): cuántos euros recibe o paga el cliente. */
+  @Public()
+  @Get('exchange/quote')
+  quote(@Query(new ZodPipe(quoteQuerySchema)) q: z.infer<typeof quoteQuerySchema>) {
+    return this.rates.quote(q.direction, q.asset, q.amount);
+  }
 
   /** Condiciones públicas del servicio de cambio (activos, redes, límites). */
   @Public()

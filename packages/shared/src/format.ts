@@ -52,3 +52,15 @@ export function relativeTime(iso: string, locale = 'es'): string {
   if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
   return rtf.format(Math.round(diff / 86400), 'day');
 }
+
+/** Importe en euros con formato español: 1.234,56 €. */
+export function formatEur(v: string | number, locale = 'es-ES'): string {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(n) : '—';
+}
+
+/** Número con formato español y hasta `max` decimales. */
+export function formatNum(v: string | number, max = 6, locale = 'es-ES'): string {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? new Intl.NumberFormat(locale, { maximumFractionDigits: max }).format(n) : '—';
+}

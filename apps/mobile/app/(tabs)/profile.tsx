@@ -61,7 +61,10 @@ export default function Profile() {
         <Button title="Guardar cambios" variant="primary" onPress={save} loading={busy} />
       </Card>
       <Card>
-        <H2>Mis wallets</H2>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <H2>Mis wallets</H2>
+          <Button title="Mis operaciones" size="sm" variant="ghost" onPress={() => router.push('/operations')} />
+        </Row>
         <MyWallets />
       </Card>
       <Card onPress={() => router.push('/security')}>

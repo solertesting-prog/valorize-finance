@@ -622,6 +622,10 @@ model ExchangeRequest {
   fiatAmount   Decimal?          @db.Decimal(20, 2) // EUR
   feeAmount    Decimal?          @db.Decimal(20, 2) // EUR
   internalNote String?           @db.VarChar(1000)
+  /// Cotización orientativa mostrada al cliente al enviar la solicitud.
+  quotedRate       Decimal?      @db.Decimal(20, 8)
+  quotedFiatAmount Decimal?      @db.Decimal(20, 2)
+  quotedAt         DateTime?
   /// Al completar la operación en oficina.
   txHash       String?           @db.VarChar(100)
   /// Verificación on-chain de txHash (ver TxVerificationService).
@@ -727,6 +731,15 @@ model ExchangeSettings {
   autoApproveEnabled      Boolean @default(false)
   autoApproveMaxAmount    Decimal @default(1000) @db.Decimal(20, 6)
   autoApproveMinCompleted Int     @default(2)
+  /// Cotización: AUTO = precio de mercado (CoinGecko) con respaldo manual; MANUAL = solo el tipo fijado.
+  rateSource         String         @default("AUTO") @db.VarChar(10)
+  /// Tipo medio manual en EUR por unidad: { "USDT": "0.92", "USDC": "0.92" }
+  manualRates        Json           @default("{}")
+  /// Margen sobre el tipo medio (%): el cliente vende cripto / el cliente compra cripto.
+  sellSpreadPct      Decimal        @default(1.5) @db.Decimal(6, 3)
+  buySpreadPct       Decimal        @default(1.5) @db.Decimal(6, 3)
+  /// Comisión fija por operación (EUR).
+  fixedFeeEur        Decimal        @default(0) @db.Decimal(10, 2)
   /// Direcciones propias por red: { "TRON": ["T…"], "ETHEREUM": ["0x…"] }
   receivingAddresses Json           @default("{}")
   updatedAt          DateTime       @updatedAt

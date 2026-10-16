@@ -5,6 +5,7 @@ import { ChainNetwork, CryptoAsset, errorMessage, ExchangeSettingsDto, NETWORK_L
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useState } from 'react';
 import { Alert, Button, ErrorBox, Spinner, TextArea, TextInput, useToast } from '@/components/ui';
+import { QuoteBox } from '@/components/quote';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -38,6 +39,7 @@ export default function ExchangeSettingsPage() {
     onSuccess: (d) => {
       qc.setQueryData(['admin', 'exchange-settings'], d);
       qc.invalidateQueries({ queryKey: ['exchange-settings'] });
+      qc.invalidateQueries({ queryKey: ['quote'] });
       toast('Ajustes guardados');
     },
   });
@@ -118,6 +120,69 @@ export default function ExchangeSettingsPage() {
               hint="Más nueva genera un aviso en la auditoría."
             />
           </div>
+        </fieldset>
+
+        <fieldset className="card stack" disabled={readOnly} style={{ margin: 0 }}>
+          <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Cotización</h2>
+          <p className="small muted" style={{ margin: 0 }}>
+            Lo que ve el cliente en el simulador y al pedir el cambio. Es orientativo: el importe final se fija al aprobar o en la oficina.
+          </p>
+          <label className="check">
+            <input type="radio" name="rateSource" checked={f.rateSource !== 'MANUAL'} onChange={() => setF({ ...f, rateSource: 'AUTO' })} />
+            <span>Precio de mercado (se actualiza solo; si no está disponible, se usa el tipo manual)</span>
+          </label>
+          <label className="check">
+            <input type="radio" name="rateSource" checked={f.rateSource === 'MANUAL'} onChange={() => setF({ ...f, rateSource: 'MANUAL' })} />
+            <span>Tipo manual fijado por la oficina</span>
+          </label>
+          <div className="grid" style={{ '--min': '160px' } as React.CSSProperties}>
+            {(['USDT', 'USDC'] as CryptoAsset[]).map((a) => (
+              <TextInput
+                key={a}
+                label={`Tipo manual ${a} (EUR)`}
+                inputMode="decimal"
+                placeholder="0,92"
+                value={f.manualRates?.[a] ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value.replace(',', '.').trim();
+                  const next = { ...(f.manualRates ?? {}) };
+                  if (v) next[a] = v;
+                  else delete next[a];
+                  setF({ ...f, manualRates: next });
+                }}
+                hint="Tipo medio, sin margen."
+              />
+            ))}
+            <TextInput
+              label="Margen cuando el cliente vende (%)"
+              inputMode="decimal"
+              value={f.sellSpreadPct ?? ''}
+              onChange={(e) => setF({ ...f, sellSpreadPct: e.target.value.replace(',', '.') })}
+            />
+            <TextInput
+              label="Margen cuando el cliente compra (%)"
+              inputMode="decimal"
+              value={f.buySpreadPct ?? ''}
+              onChange={(e) => setF({ ...f, buySpreadPct: e.target.value.replace(',', '.') })}
+            />
+            <TextInput
+              label="Comisión fija por operación (EUR)"
+              inputMode="decimal"
+              value={f.fixedFeeEur ?? ''}
+              onChange={(e) => setF({ ...f, fixedFeeEur: e.target.value.replace(',', '.') })}
+            />
+          </div>
+          <div className="grid" style={{ '--min': '220px' } as React.CSSProperties}>
+            <div>
+              <div className="xs muted" style={{ marginBottom: 4 }}>Así lo ve ahora un cliente que vende 100 USDT</div>
+              <QuoteBox direction="SELL_CRYPTO" asset="USDT" amount="100" />
+            </div>
+            <div>
+              <div className="xs muted" style={{ marginBottom: 4 }}>… y uno que compra 100 USDT</div>
+              <QuoteBox direction="BUY_CRYPTO" asset="USDT" amount="100" />
+            </div>
+          </div>
+          <p className="xs muted" style={{ margin: 0 }}>La vista previa usa los ajustes guardados.</p>
         </fieldset>
 
         <fieldset className="card stack" disabled={readOnly} style={{ margin: 0 }}>

@@ -1,8 +1,10 @@
 'use client';
 
+import { CryptoAsset, ExchangeDirection } from '@valorize/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { QuoteBox } from '@/components/quote';
 import { homeFor, useAuth } from '@/lib/auth';
 
 const JOURNEY = [
@@ -60,7 +62,9 @@ export default function Landing() {
           </ol>
         </div>
 
-        <div className="phone" aria-hidden>
+        <div className="stack" style={{ alignItems: 'center' }}>
+          <Simulator />
+          <div className="phone" aria-hidden>
           <div className="screen">
             <div className="small" style={{ fontWeight: 700, marginBottom: 18 }}>
               Mi QR
@@ -78,9 +82,48 @@ export default function Landing() {
               Barcelona Centro, 11:30
             </div>
           </div>
+          </div>
         </div>
       </section>
     </div>
+  );
+}
+
+/** Simulador público: cuánto recibe o paga el cliente, con el tipo del día. */
+function Simulator() {
+  const [direction, setDirection] = useState<ExchangeDirection>('SELL_CRYPTO');
+  const [asset, setAsset] = useState<CryptoAsset>('USDT');
+  const [amount, setAmount] = useState('500');
+  return (
+    <section className="card stack simulator" aria-label="Simula tu cambio" style={{ width: '100%' }}>
+      <strong>Simula tu cambio</strong>
+      <div className="row" role="group" aria-label="Operación" style={{ gap: 8 }}>
+        <button type="button" className={`btn sm ${direction === 'SELL_CRYPTO' ? 'primary' : ''}`} aria-pressed={direction === 'SELL_CRYPTO'} onClick={() => setDirection('SELL_CRYPTO')}>
+          Vendo cripto
+        </button>
+        <button type="button" className={`btn sm ${direction === 'BUY_CRYPTO' ? 'primary' : ''}`} aria-pressed={direction === 'BUY_CRYPTO'} onClick={() => setDirection('BUY_CRYPTO')}>
+          Compro cripto
+        </button>
+      </div>
+      <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
+        <input
+          className="input mono"
+          inputMode="decimal"
+          aria-label="Importe"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ''))}
+          style={{ fontSize: 'var(--t-lg)' }}
+        />
+        <select className="select" style={{ width: 'auto' }} value={asset} onChange={(e) => setAsset(e.target.value as CryptoAsset)} aria-label="Moneda">
+          <option value="USDT">USDT</option>
+          <option value="USDC">USDC</option>
+        </select>
+      </div>
+      <QuoteBox direction={direction} asset={asset} amount={amount} />
+      <Link href="/registro" className="btn primary">
+        Reservar mi cambio
+      </Link>
+    </section>
   );
 }
 

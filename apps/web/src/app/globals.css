@@ -425,3 +425,8 @@ dialog.modal .foot { display: flex; justify-content: flex-end; gap: 8px; padding
   .tracker .current .dot { animation: tracker-pulse 2s ease-in-out infinite; }
   @keyframes tracker-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--amber) 10%, transparent); } }
 }
+
+/* Cotización / simulador */
+.quote { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: var(--slate-2); }
+.quote-amount { font-size: var(--t-2xl, 2rem); font-weight: 700; color: var(--mint); line-height: 1.15; margin: 2px 0 4px; }
+.simulator { max-width: 420px; }
