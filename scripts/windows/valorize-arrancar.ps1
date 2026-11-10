@@ -68,6 +68,21 @@ $env:SEED_DEMO = 'true'
 Run 'pnpm --filter @valorize/api seed'
 
 Step 'Arrancando API (puerto 4000) y web (puerto 3000)'
+# Si quedo abierta una API o web de una ejecucion anterior de este proyecto, se cierra para liberar el puerto.
+function FreePort($port) {
+  $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+  foreach ($c in $conns) {
+    $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)" -ErrorAction SilentlyContinue
+    if ($p -and $p.CommandLine -and $p.CommandLine.ToLower().Contains($Repo.ToLower())) {
+      Write-Host "Cerrando la ejecucion anterior que usaba el puerto $port"
+      Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+    } elseif ($p) {
+      Fail "El puerto $port lo usa otro programa ($($p.Name)). Cierralo y vuelve a ejecutar."
+    }
+  }
+}
+FreePort 4000
+FreePort 3000
 $apiLog = Join-Path $Logs 'api.log'; $webLog = Join-Path $Logs 'web.log'
 Start-Process cmd -ArgumentList '/k', "title Valorize API && cd /d `"$Repo`" && pnpm --filter @valorize/api dev > `"$apiLog`" 2>&1"
 Start-Process cmd -ArgumentList '/k', "title Valorize WEB && cd /d `"$Repo`" && pnpm --filter @valorize/web dev > `"$webLog`" 2>&1"

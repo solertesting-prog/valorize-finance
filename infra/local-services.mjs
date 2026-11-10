@@ -112,16 +112,48 @@ async function ensureStorage() {
   }
 }
 
-function run(name, cmd, args, env = {}) {
+/**
+ * Arranca un servicio en segundo plano. Los opcionales (correo, almacenamiento) no tumban el resto si fallan:
+ * un "spawn UNKNOWN" en Windows suele ser el antivirus bloqueando el .exe.
+ */
+function run(name, cmd, args, { optional = false } = {}) {
   const logFile = createWriteStream(path.join(ROOT, `${name}.log`), { flags: 'a' });
-  const child = spawn(cmd, args, { env: { ...process.env, ...env }, windowsHide: true });
-  child.stdout.pipe(logFile);
-  child.stderr.pipe(logFile);
-  child.on('exit', (code) => {
-    if (!shuttingDown) fail(`${name} se ha detenido (código ${code}). Revisa .local-services/${name}.log`);
-  });
+  const child = spawn(cmd, args, { env: process.env, windowsHide: true });
+  child.stdout?.pipe(logFile);
+  child.stderr?.pipe(logFile);
+  let failed = false;
+  const onFail = (why) => {
+    if (failed || shuttingDown) return;
+    failed = true;
+    if (optional) {
+      log(`AVISO: ${name} no ha podido arrancar (${why}). El resto sigue funcionando.${name === 'mailpit' ? ' Los correos (y sus códigos) aparecerán en la ventana de la API.' : ''}`);
+      if (/UNKNOWN|EPERM|EACCES/.test(why)) log(`  Si el antivirus lo ha bloqueado, permite ${cmd}`);
+    } else {
+      fail(`${name} no ha podido arrancar o se ha detenido (${why}). Revisa .local-services/${name}.log${/UNKNOWN|EPERM|EACCES/.test(why) ? `. Si el antivirus lo ha bloqueado, permite ${cmd}` : ''}`);
+    }
+  };
+  child.on('error', (e) => onFail(e.code ?? e.message));
+  child.on('exit', (code) => onFail(`código ${code}`));
   children.push(child);
-  return child;
+  return { child, ok: () => !failed };
+}
+
+/**
+ * Para los servicios que hayan quedado vivos de una ejecución anterior (por ejemplo, si se cerró la ventana con la X):
+ * primero PostgreSQL de forma ordenada y después cualquier proceso lanzado desde .local-services.
+ */
+function stopLeftovers() {
+  const pgDir = path.join(DATA, 'postgres');
+  const nm = path.join(ROOT, 'node_modules');
+  const pgCtl = existsSync(nm) ? findFile(nm, 'pg_ctl.exe') : null;
+  if (pgCtl && existsSync(path.join(pgDir, 'postmaster.pid'))) {
+    log('Parando un PostgreSQL que quedó abierto de una ejecución anterior...');
+    spawnSync(pgCtl, ['stop', '-D', pgDir, '-m', 'fast', '-w', '-t', '20'], { stdio: 'ignore', windowsHide: true });
+  }
+  const ps = `Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith('${ROOT.replace(/'/g, "''")}', [System.StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $_.Name }`;
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', windowsHide: true });
+  const killed = (r.stdout ?? '').split(/\r?\n/).filter(Boolean);
+  if (killed.length) log(`Cerrados procesos de una ejecución anterior: ${[...new Set(killed)].join(', ')}`);
 }
 
 async function waitPort(port, name, secs = 60) {
@@ -191,13 +223,27 @@ async function main() {
   mkdirSync(DATA, { recursive: true });
   rmSync(READY, { force: true });
 
-  for (const [port, name] of [[5432, 'PostgreSQL'], [6379, 'Redis'], [9000, 'Almacenamiento S3'], [1025, 'Mailpit']]) {
-    if (await portBusy(port)) throw new Error(`El puerto ${port} (${name}) ya está en uso. Cierra el programa que lo usa o una ejecución anterior de este script.`);
+  const ports = [[5432, 'PostgreSQL'], [6379, 'Redis'], [9000, 'Almacenamiento S3'], [1025, 'Mailpit']];
+  const busy = async () => (await Promise.all(ports.map(async ([p, n]) => ((await portBusy(p)) ? [p, n] : null)))).filter(Boolean);
+  if ((await busy()).length) {
+    stopLeftovers();
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  const still = await busy();
+  if (still.length) {
+    const [port, name] = still[0];
+    throw new Error(
+      `El puerto ${port} (${name}) lo está usando otro programa.` +
+        (port === 5432 ? ' ¿Tienes PostgreSQL instalado en el PC? Para su servicio en services.msc o desinstálalo.' : ' Ciérralo y vuelve a ejecutar valorize-arrancar.bat.'),
+    );
   }
 
   const [redis, mailpit, storage] = await Promise.all([
     ensureZipTool('redis', 'redis-server.exe', 'redis-windows/redis-windows', /Windows-x64-msys2\.zip$/),
-    ensureZipTool('mailpit', 'mailpit.exe', 'axllent/mailpit', /windows-amd64\.zip$/),
+    ensureZipTool('mailpit', 'mailpit.exe', 'axllent/mailpit', /windows-amd64\.zip$/).catch((e) => {
+      log(`AVISO: no se pudo preparar Mailpit (${e.message}). Los correos aparecerán en la ventana de la API.`);
+      return null;
+    }),
     ensureStorage(),
   ]);
 
@@ -207,25 +253,32 @@ async function main() {
   log('Arrancando Redis, almacenamiento y Mailpit...');
   mkdirSync(path.join(DATA, 'redis'), { recursive: true });
   run('redis', redis, ['--port', '6379', '--bind', '127.0.0.1', '--dir', path.join(DATA, 'redis'), '--appendonly', 'yes']);
+  let s3 = null;
   if (storage) {
     const dir = path.join(DATA, 's3');
     mkdirSync(dir, { recursive: true });
-    run('almacenamiento', storage, [
+    s3 = run('almacenamiento', storage, [
       'server', `-dir=${dir}`, '-ip=127.0.0.1', '-ip.bind=127.0.0.1',
       '-master.port=19333', '-volume.port=18080', '-filer.port=18888', '-master.volumeSizeLimitMB=1024',
       '-s3', '-s3.port=9000',
-    ]);
+    ], { optional: true });
   }
-  run('mailpit', mailpit, ['--smtp', '127.0.0.1:1025', '--listen', '127.0.0.1:8025']);
+  const mail = mailpit ? run('mailpit', mailpit, ['--smtp', '127.0.0.1:1025', '--listen', '127.0.0.1:8025'], { optional: true }) : null;
 
-  await Promise.all([waitPort(6379, 'Redis'), waitPort(1025, 'Mailpit'), storage ? waitPort(9000, 'Almacenamiento S3', 90) : null]);
+  // Redis es imprescindible; correo y almacenamiento, si fallan, solo avisan.
+  const soft = (p) => p.then(() => true, () => false);
+  const [, mailUp, s3Up] = await Promise.all([
+    waitPort(6379, 'Redis'),
+    mail ? soft(waitPort(1025, 'Mailpit', 30)) : false,
+    s3 ? soft(waitPort(9000, 'Almacenamiento S3', 90)) : false,
+  ]);
   writeFileSync(READY, new Date().toISOString());
 
   console.log('\n  Servicios listos:');
   console.log('    PostgreSQL  localhost:5432  (valorize / valorize, base de datos "valorize")');
   console.log('    Redis       localhost:6379');
-  console.log(`    S3          ${storage ? 'localhost:9000' : 'no disponible (subida de documentos desactivada)'}`);
-  console.log('    Correo      http://localhost:8025');
+  console.log(`    S3          ${s3Up ? 'localhost:9000' : 'no disponible (subida de documentos desactivada)'}`);
+  console.log(`    Correo      ${mailUp ? 'http://localhost:8025' : 'no disponible: los correos y sus códigos salen en la ventana de la API'}`);
   console.log('\n  Deja esta ventana abierta. Ctrl+C para pararlo todo.\n');
 }
 

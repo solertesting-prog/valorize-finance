@@ -38,6 +38,12 @@ export class MailerService implements OnModuleInit {
       });
     } catch (e) {
       this.logger.error(`Fallo enviando email a ${maskEmail(msg.to)}: ${(e as Error).message}`);
+      // En desarrollo, sin servidor de correo (Mailpit) no se bloquea nada: el contenido sale en el log de la API
+      // (así se pueden leer los códigos de verificación).
+      if (this.env.NODE_ENV !== 'production') {
+        this.logger.warn(`[correo no enviado] Para: ${msg.to} · ${msg.subject}\n${msg.text}${msg.cta ? `\n${msg.cta.label}: ${msg.cta.url}` : ''}`);
+        return;
+      }
       throw e;
     }
   }
