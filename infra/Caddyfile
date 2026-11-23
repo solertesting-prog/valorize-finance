@@ -1,6 +1,4 @@
-{
-	email {$ACME_EMAIL}
-}
+# Certificados HTTPS automáticos (Let's Encrypt). El email de aviso es opcional.
 
 # Web: cliente, panel del empleado y backoffice. /api/v1 se reenvía a la API desde Next.js (mismo origen).
 {$APP_DOMAIN} {
