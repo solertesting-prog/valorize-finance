@@ -64,7 +64,9 @@ for i in $(seq 1 60); do
 done
 
 echo "Datos iniciales (ubicaciones, servicios, requisitos KYC y administrador)..."
-set -a; . "$ENVF"; set +a
+# Leer valores sin "source" (algunas líneas, como MAIL_FROM, no son sintaxis de shell).
+getv() { grep -m1 "^$1=" "$ENVF" | cut -d= -f2-; }
+POSTGRES_USER=$(getv POSTGRES_USER); POSTGRES_PASSWORD=$(getv POSTGRES_PASSWORD); POSTGRES_DB=$(getv POSTGRES_DB)
 docker build -q --target build -f apps/api/Dockerfile -t valorize/api-build . >/dev/null
 ADMIN_PASSWORD=$($AWS ssm get-parameter --name "$PREFIX/admin-password" --with-decryption --query Parameter.Value --output text)
 docker run --rm --network valorize_default --env-file "$ENVF" \
