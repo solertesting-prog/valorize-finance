@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth';
 
 /** Hechos del producto, no métricas comerciales. */
 const STATS: [string, string][] = [
-  ['2', 'áreas de servicio: P2P y BOT'],
+  ['3', 'áreas: P2P, BOT y NODAL'],
   ['1 %', 'de riesgo máximo por operación en el BOT'],
   ['100 %', 'de clientes con identidad verificada'],
   ['24/7', 'seguimiento automatizado de los mercados'],
@@ -31,7 +31,7 @@ const PRINCIPLES: [string, string, string][] = [
 const FAQ: [string, string][] = [
   [
     '¿Qué es Valorize Finance?',
-    'Una empresa de inversión y servicios financieros que combina tecnología propia con atención presencial. Hoy ofrecemos dos áreas: BOT, inversión automatizada con gestión del riesgo, y P2P, cambio presencial con cita previa.',
+    'Una empresa de inversión y servicios financieros que combina tecnología propia con atención presencial. Hoy tiene tres áreas: BOT, inversión automatizada con gestión del riesgo; P2P, cambio presencial con cita previa; y NODAL, nuestro panel interno de operaciones.',
   ],
   [
     '¿Qué es el BOT?',
@@ -207,6 +207,25 @@ export default function ValorizeHome() {
                 <li>Web y app móvil</li>
               </ul>
             </Link>
+            <a href="/nodal" className="area">
+              <div className="area-main">
+                <span className="badge">Uso interno</span>
+                <h3>NODAL</h3>
+                <p className="area-sub">Panel de operaciones</p>
+                <p className="muted">
+                  Registro de todas las operaciones, CRM que se actualiza solo y un dashboard con todo normalizado a euros. Acceso para el equipo de Valorize.
+                </p>
+                <span className="area-cta">
+                  Abrir NODAL <span aria-hidden>→</span>
+                </span>
+              </div>
+              <ul className="area-list">
+                <li>Registro de operaciones</li>
+                <li>CRM automático de clientes</li>
+                <li>Dashboard en euros</li>
+                <li>Acceso con usuario del equipo</li>
+              </ul>
+            </a>
           </div>
         </div>
       </section>

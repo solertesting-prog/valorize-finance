@@ -7,6 +7,14 @@
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		-Server
 	}
+	# Nodal (panel de operaciones), servido en /nodal. Desplegado aparte en /opt/nodal-deploy
+	# (red docker nodal_default, a la que deploy.sh conecta Caddy).
+	handle /nodal* {
+		redir /nodal /nodal/transacciones
+		redir /nodal/ /nodal/transacciones
+		reverse_proxy nodal:3000
+	}
+
 	reverse_proxy web:3000
 }
 

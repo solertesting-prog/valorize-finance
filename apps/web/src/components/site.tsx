@@ -8,14 +8,22 @@ import { homeFor, useAuth } from '@/lib/auth';
 import { QuoteBox } from './quote';
 import { Icon } from './ui';
 
-type NavItem = { href: string; label: string; cat?: boolean };
+type NavItem = { href: string; label: string; external?: boolean };
 
-/** Web oficial de Valorize Finance: P2P es una de sus categorías. */
+/** Panel de operaciones Nodal: aplicación aparte servida en /nodal (fuera de esta web). */
+export const NODAL_URL = '/nodal';
+
+/** Categorías de Valorize Finance: siempre visibles en la cabecera. */
+export const CATEGORIES: NavItem[] = [
+  { href: '/p2p', label: 'P2P' },
+  { href: '/bot', label: 'BOT' },
+  { href: NODAL_URL, label: 'NODAL', external: true },
+];
+
+/** Secciones de la web oficial. */
 export const CORPORATE_NAV: NavItem[] = [
-  { href: '/p2p', label: 'P2P', cat: true },
-  { href: '/bot', label: 'BOT', cat: true },
   { href: '/#nosotros', label: 'Nosotros' },
-  { href: '/#principios', label: 'Cómo trabajamos' },
+  { href: '/#servicios', label: 'Servicios' },
   { href: '/#preguntas', label: 'Preguntas' },
   { href: '/#contacto', label: 'Contacto' },
 ];
@@ -46,7 +54,7 @@ export function SiteHeader({ nav = CORPORATE_NAV, section }: { nav?: NavItem[]; 
   const user = isBot ? null : p2pUser;
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const all = section ? [...nav, { href: '/', label: 'Valorize Finance' }] : nav;
+  const all: NavItem[] = [...CATEGORIES, ...nav, ...(section ? [{ href: '/', label: 'Valorize Finance' }] : [])];
   return (
     <header className="site-header">
       <div className="site-wrap">
@@ -58,17 +66,26 @@ export function SiteHeader({ nav = CORPORATE_NAV, section }: { nav?: NavItem[]; 
             <b>VALORIZE</b> FINANCE{section ? <em> · {section}</em> : null}
           </span>
         </Link>
-        <nav className="main" aria-label="Principal">
-          {nav.map((n) => (
-            <Link key={n.href} href={n.href} className={n.cat ? 'cat' : undefined} aria-current={pathname === n.href ? 'page' : undefined}>
-              {n.label}
-            </Link>
-          ))}
-          {section ? (
-            <Link href="/" className="back">
-              ← Valorize Finance
-            </Link>
-          ) : null}
+        <nav className="main" aria-label="Categorías">
+          {CATEGORIES.map((c) => {
+            const active = pathname === c.href || pathname.startsWith(`${c.href}/`);
+            return c.external ? (
+              <a key={c.href} href={c.href} className="cat">
+                {c.label}
+              </a>
+            ) : (
+              <Link key={c.href} href={c.href} className={`cat ${active ? 'on' : ''}`} aria-current={active ? 'page' : undefined}>
+                {c.label}
+              </Link>
+            );
+          })}
+          {!section
+            ? nav.map((n) => (
+                <Link key={n.href} href={n.href}>
+                  {n.label}
+                </Link>
+              ))
+            : null}
         </nav>
         <div className="actions">
           {ready && user ? (
@@ -96,12 +113,32 @@ export function SiteHeader({ nav = CORPORATE_NAV, section }: { nav?: NavItem[]; 
           </button>
         </div>
       </div>
+      {section ? (
+        <nav className="site-subnav" aria-label={`Secciones de ${section}`}>
+          <div className="site-wrap">
+            <Link href="/" className="back">
+              ← Valorize Finance
+            </Link>
+            {nav.map((n) => (
+              <Link key={n.href} href={n.href}>
+                {n.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+      ) : null}
       <nav id="site-mobile-nav" className={`site-mobile-nav ${open ? 'open' : ''}`} aria-label="Menú móvil">
-        {all.map((n) => (
-          <Link key={n.href} href={n.href} onClick={() => setOpen(false)}>
-            {n.label}
-          </Link>
-        ))}
+        {all.map((n) =>
+          n.external ? (
+            <a key={n.href} href={n.href}>
+              {n.label}
+            </a>
+          ) : (
+            <Link key={n.href} href={n.href} onClick={() => setOpen(false)}>
+              {n.label}
+            </Link>
+          ),
+        )}
         {isBot ? (
           <a href={BOT_PLATFORM_URL} rel="noopener">
             Acceder al BOT
@@ -152,6 +189,7 @@ export function SiteFooter() {
             <Link href="/#principios">Cómo trabajamos</Link>
             <Link href="/#preguntas">Preguntas frecuentes</Link>
             <Link href="/#contacto">Contacto</Link>
+            <a href={NODAL_URL}>Nodal · panel de operaciones</a>
           </div>
           <div>
             <h4>Legal</h4>

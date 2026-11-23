@@ -582,3 +582,12 @@ dialog.modal .foot { display: flex; justify-content: flex-end; gap: 8px; padding
   .area { transition: none; }
 }
 .areas { display: grid; gap: 20px; }
+
+/* Categorías siempre visibles y subnavegación de cada sección */
+.site-header nav.main a.cat { color: var(--mint); font-family: var(--font-brand); font-weight: 700; letter-spacing: 0.06em; border: 1px solid color-mix(in srgb, var(--mint) 35%, transparent); }
+.site-header nav.main a.cat.on, .site-header nav.main a.cat:hover { background: var(--mint); color: var(--ink); border-color: var(--mint); }
+.site-subnav { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.site-subnav .site-wrap { display: flex; gap: 4px; align-items: center; min-height: 44px; overflow-x: auto; scrollbar-width: none; }
+.site-subnav a { color: var(--fog); text-decoration: none; padding: 6px 12px; border-radius: 8px; font-size: var(--t-sm); white-space: nowrap; }
+.site-subnav a:hover { color: var(--paper); background: var(--slate); }
+.site-subnav a.back { margin-right: 8px; padding-left: 0; }

@@ -55,6 +55,13 @@ echo "Construyendo y arrancando (la primera vez tarda 10-15 minutos)..."
 export DOCKER_BUILDKIT=1
 $COMPOSE build --pull
 $COMPOSE up -d --remove-orphans
+# Nodal (desplegado aparte en /opt/nodal-deploy) se sirve en /nodal a través de este Caddy.
+if docker network inspect nodal_default >/dev/null 2>&1; then
+  CADDY=$($COMPOSE ps -q caddy)
+  docker network connect nodal_default "$CADDY" 2>/dev/null || true
+fi
+# Caddy monta el Caddyfile como archivo: tras un git pull hay que reiniciarlo para que lea el nuevo.
+$COMPOSE restart caddy >/dev/null
 
 echo "Esperando a la API..."
 for i in $(seq 1 60); do
