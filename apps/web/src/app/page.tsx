@@ -10,36 +10,40 @@ import { useAuth } from '@/lib/auth';
 
 /** Hechos del producto, no métricas comerciales. */
 const STATS: [string, string][] = [
-  ['4', 'redes blockchain soportadas'],
-  ['2', 'stablecoins: USDT y USDC'],
+  ['2', 'áreas de servicio: P2P y BOT'],
+  ['1 %', 'de riesgo máximo por operación en el BOT'],
   ['100 %', 'de clientes con identidad verificada'],
-  ['1', 'justificante verificable por operación'],
+  ['24/7', 'seguimiento automatizado de los mercados'],
 ];
 
-const RAILS = ['TRON', 'Ethereum', 'Polygon', 'BNB Chain', 'USDT', 'USDC', 'OFAC', 'MiCA'];
+const RAILS = ['Gestión del riesgo', 'Método', 'Disciplina', 'Transparencia', 'Cumplimiento', 'Atención en persona', 'Seguridad', 'Trazabilidad'];
 
 /** Lo que hace distinta a Valorize. */
 const PRINCIPLES: [string, string, string][] = [
+  ['sliders', 'Método antes que intuición', 'Cada decisión sigue reglas definidas y probadas con años de datos. Nada se deja a la emoción del momento.'],
+  ['shield', 'El riesgo, siempre acotado', 'Sabemos cuánto se puede perder antes de entrar. Limitar las pérdidas es la primera regla.'],
   ['building', 'Presencia física', 'Oficinas reales y un equipo al que puedes mirar a la cara. Lo digital, con alguien detrás que responde.'],
-  ['users', 'Clientes identificados', 'Cada persona que opera con nosotros está verificada. Es la base de la confianza entre todos.'],
-  ['shield', 'Cumplimiento desde el diseño', 'Control de sanciones, prueba de titularidad de wallets y alertas de riesgo integradas en cada flujo.'],
-  ['link', 'Todo comprobado en la red', 'No damos nada por bueno sin verlo en la blockchain: importe, token, origen y destino.'],
-  ['chart', 'Precios a la vista', 'Cotización de mercado y margen explícito antes de comprometerte. Sin letra pequeña.'],
+  ['users', 'Clientes identificados', 'Cada persona que trabaja con nosotros está verificada. Es la base de la confianza entre todos.'],
+  ['chart', 'Costes y resultados a la vista', 'Precios, márgenes y evolución, explicados con claridad. Sin letra pequeña.'],
   ['doc', 'Trazabilidad completa', 'Registro de auditoría inalterable y justificantes que cualquiera puede verificar.'],
 ];
 
 const FAQ: [string, string][] = [
   [
     '¿Qué es Valorize Finance?',
-    'Una empresa de servicios financieros con activos digitales que combina tecnología propia con atención presencial. Nuestro primer servicio es P2P, el cambio presencial de USDT y USDC por euros.',
+    'Una empresa de inversión y servicios financieros que combina tecnología propia con atención presencial. Hoy ofrecemos dos áreas: BOT, inversión automatizada con gestión del riesgo, y P2P, cambio presencial con cita previa.',
   ],
   [
-    '¿Qué es la categoría P2P?',
-    'Es nuestra plataforma de cambio presencial: simulas la cotización, solicitas el cambio desde la web o la app, recibes un QR y completas la operación en una oficina con nuestro equipo.',
+    '¿Qué es el BOT?',
+    'Nuestro sistema de inversión automatizada: sigue la tendencia del mercado con reglas fijas, limita el riesgo de cada operación y te explica cada decisión. Está en beta privada, por invitación.',
+  ],
+  [
+    '¿Qué es P2P?',
+    'Nuestro servicio de cambio presencial: consultas la cotización, lo solicitas desde la web o la app, recibes un QR y lo completas en la oficina con nuestro equipo.',
   ],
   [
     '¿Por qué pedís verificar la identidad?',
-    'La normativa europea de prevención del blanqueo exige identificar a cada cliente. Lo haces una sola vez y te sirve para operar mientras tu documento esté en vigor.',
+    'La normativa europea de prevención del blanqueo exige identificar a cada cliente. Lo haces una sola vez y te sirve mientras tu documento esté en vigor.',
   ],
   [
     '¿Dónde estáis?',
@@ -47,15 +51,15 @@ const FAQ: [string, string][] = [
   ],
   [
     '¿Es esto asesoramiento financiero?',
-    'No. Prestamos servicios de cambio y te damos información clara para que decidas tú. Operar con criptoactivos conlleva riesgos.',
+    'No. Ofrecemos herramientas y servicios, y te damos información clara para que decidas tú. Toda inversión conlleva riesgos, incluida la pérdida del capital.',
   ],
 ];
 
 const CHECKS: [string, string][] = [
-  ['Identidad', 'verificada'],
-  ['Wallet', 'auditada'],
-  ['Transacción', 'comprobada en la red'],
-  ['Justificante', 'emitido'],
+  ['Análisis', 'con reglas definidas'],
+  ['Riesgo', 'acotado antes de entrar'],
+  ['Ejecución', 'automática y comprobada'],
+  ['Seguimiento', 'e informe de cada operación'],
 ];
 
 export default function ValorizeHome() {
@@ -71,28 +75,28 @@ export default function ValorizeHome() {
         <div className="grid-lines" aria-hidden />
         <div className="site-wrap grid2">
           <div>
-            <span className="s-badge">Valorize Finance · Barcelona</span>
+            <span className="s-badge">Valorize Finance · Inversión con método</span>
             <h1>
-              Finanzas digitales con <em>los pies en la tierra</em>.
+              Haz crecer tu patrimonio <em>con método</em>.
             </h1>
             <p className="lede">
-              Unimos la tecnología de los activos digitales con la seguridad de una oficina física. Clientes identificados, operaciones comprobadas en la blockchain
-              y personas reales al otro lado.
+              Tecnología de inversión con reglas claras, riesgo controlado y personas reales al otro lado. Para que tu dinero trabaje con disciplina, no con
+              impulsos.
             </p>
             <div className="row" style={{ gap: 12 }}>
-              <Link href={access} className="btn primary lg">
-                {user ? 'Ir a P2P' : 'Solicitar acceso'}
+              <Link href="#servicios" className="btn primary lg">
+                Descubrir los servicios
               </Link>
-              <Link href="/p2p" className="btn lg">
-                Conocer P2P
+              <Link href="/bot" className="btn lg">
+                Conocer el BOT
               </Link>
             </div>
-            <p className="note">Acceso solo para clientes con identidad verificada</p>
+            <p className="note">Clientes verificados · Riesgo definido · Total transparencia</p>
           </div>
 
-          <aside className="ledger" aria-label="Cómo garantizamos cada operación">
+          <aside className="ledger" aria-label="El método Valorize">
             <div className="ledger-head">
-              <span className="mono">VALORIZE · CONTROL DE OPERACIÓN</span>
+              <span className="mono">VALORIZE · MÉTODO</span>
               <span className="dot" aria-hidden />
             </div>
             <ol>
@@ -112,8 +116,8 @@ export default function ValorizeHome() {
         </div>
       </section>
 
-      {/* Tira de redes y estándares, en lugar de logos de socios */}
-      <div className="rails" aria-label="Redes, monedas y estándares con los que trabajamos">
+      {/* Tira de valores, en lugar de logos de socios */}
+      <div className="rails" aria-label="Nuestros valores">
         <div className="rails-track">
           {[...RAILS, ...RAILS].map((r, i) => (
             <span key={i} aria-hidden={i >= RAILS.length}>
@@ -140,16 +144,16 @@ export default function ValorizeHome() {
         <div className="site-wrap about">
           <div>
             <span className="kicker">Nosotros</span>
-            <h2>Hacemos que operar con activos digitales sea tan fiable como ir al banco.</h2>
+            <h2>Invertir bien no va de adivinar el mercado, va de tener un método y cumplirlo.</h2>
           </div>
           <div className="stack">
             <p>
-              Valorize Finance nace de una idea sencilla: el dinero digital necesita la misma confianza que el de siempre. Por eso combinamos una plataforma
-              propia, que comprueba cada wallet y cada transacción, con oficinas donde atendemos en persona.
+              Valorize Finance nace de una idea sencilla: la disciplina gana a la intuición. Por eso desarrollamos tecnología propia que aplica reglas probadas,
+              limita el riesgo y explica cada decisión, y la acompañamos de oficinas donde atendemos en persona.
             </p>
             <p>
               Trabajamos solo con clientes identificados, aplicamos controles de cumplimiento en cada paso y dejamos constancia de todo. Así protegemos tu
-              dinero y el de toda la comunidad.
+              patrimonio y la confianza de todos.
             </p>
           </div>
         </div>
@@ -163,28 +167,47 @@ export default function ValorizeHome() {
             <h2>Una plataforma, organizada por categorías</h2>
             <p>Cada servicio de Valorize vive en su propia categoría, con su acceso y sus herramientas.</p>
           </div>
-          <Link href="/p2p" className="area">
-            <div className="area-main">
-              <span className="badge ok">Disponible</span>
-              <h3>P2P</h3>
-              <p className="area-sub">Cambio presencial de USDT y USDC por euros</p>
-              <p className="muted">
-                Simula la cotización, solicita tu cambio desde la web o la app, recibe tu QR y completa la operación en nuestra oficina. Con aprobación al
-                momento para clientes habituales, historial y justificantes.
-              </p>
-              <span className="area-cta">
-                Entrar en P2P <span aria-hidden>→</span>
-              </span>
-            </div>
-            <ul className="area-list">
-              <li>Compra y venta de stablecoins</li>
-              <li>TRON, Ethereum, Polygon y BNB Chain</li>
-              <li>Cita con QR en la oficina</li>
-              <li>Wallets auditadas y verificadas</li>
-              <li>Justificante en PDF verificable</li>
-              <li>Web y app móvil</li>
-            </ul>
-          </Link>
+          <div className="areas">
+            <Link href="/bot" className="area">
+              <div className="area-main">
+                <span className="badge ok">Beta privada</span>
+                <h3>BOT</h3>
+                <p className="area-sub">Inversión automatizada con gestión del riesgo</p>
+                <p className="muted">
+                  Sigue la tendencia del mercado con reglas fijas, arriesga como máximo un 1 % por operación y protege tu capital las 24 horas. Te explica cada
+                  decisión y te avisa al momento.
+                </p>
+                <span className="area-cta">
+                  Conocer el BOT <span aria-hidden>→</span>
+                </span>
+              </div>
+              <ul className="area-list">
+                <li>Estrategia validada con años de datos</li>
+                <li>Stops de protección en el mercado</li>
+                <li>Parada automática ante caídas fuertes</li>
+                <li>Tu dinero siempre en tu cuenta</li>
+              </ul>
+            </Link>
+            <Link href="/p2p" className="area">
+              <div className="area-main">
+                <span className="badge ok">Disponible</span>
+                <h3>P2P</h3>
+                <p className="area-sub">Cambio presencial con cita previa</p>
+                <p className="muted">
+                  Consulta la cotización, solicítalo desde la web o la app, recibe tu QR y complétalo en nuestra oficina, con justificante de cada operación.
+                </p>
+                <span className="area-cta">
+                  Entrar en P2P <span aria-hidden>→</span>
+                </span>
+              </div>
+              <ul className="area-list">
+                <li>Cotización al momento</li>
+                <li>Cita con QR en la oficina</li>
+                <li>Justificante verificable</li>
+                <li>Web y app móvil</li>
+              </ul>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -218,8 +241,8 @@ export default function ValorizeHome() {
             </div>
             <h2>Acceso solo para clientes verificados</h2>
             <p>
-              Valorize no es una plataforma anónima. Para operar, creas tu cuenta y verificas tu identidad una sola vez. A cambio, sabes que todas las personas
-              con las que operamos también lo están.
+              Valorize no es una plataforma anónima. Creas tu cuenta y verificas tu identidad una sola vez. A cambio, sabes que todas las personas con las que
+              trabajamos también lo están.
             </p>
             <Link href={access} className="btn primary lg">
               {user ? 'Ir a P2P' : 'Solicitar acceso'}
@@ -255,7 +278,7 @@ export default function ValorizeHome() {
           <div className="s-head">
             <span className="kicker">Contacto</span>
             <h2>Ven a vernos</h2>
-            <p>Atendemos con cita previa. Resérvala desde P2P y te esperamos en la oficina.</p>
+            <p>Atendemos con cita previa. Resérvala online y te esperamos en la oficina.</p>
           </div>
           {locs.data?.length ? (
             <div className="s-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
@@ -283,11 +306,16 @@ export default function ValorizeHome() {
       {/* Llamada final */}
       <section className="s-section s-cta">
         <div className="site-wrap">
-          <h2>Opera con la tranquilidad de saber con quién lo haces</h2>
-          <p>Crea tu cuenta, verifica tu identidad y empieza con P2P.</p>
-          <Link href={access} className="btn primary lg">
-            {user ? 'Ir a P2P' : 'Solicitar acceso'}
-          </Link>
+          <h2>Invierte con la tranquilidad de saber cómo y con quién</h2>
+          <p>Elige el servicio que encaja contigo y empieza hoy.</p>
+          <div className="row" style={{ gap: 12, justifyContent: 'center' }}>
+            <Link href="/bot" className="btn primary lg">
+              Conocer el BOT
+            </Link>
+            <Link href="/p2p" className="btn lg">
+              Ir a P2P
+            </Link>
+          </div>
         </div>
       </section>
     </SitePage>

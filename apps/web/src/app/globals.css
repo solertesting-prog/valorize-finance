@@ -516,7 +516,7 @@ dialog.modal .foot { display: flex; justify-content: flex-end; gap: 8px; padding
 .s-cta p { color: var(--fog); margin: 0 auto 26px; max-width: 54ch; }
 
 .site-footer { border-top: 1px solid var(--line); padding: 48px 0 calc(32px + env(safe-area-inset-bottom)); background: var(--ink); }
-.site-footer .cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 28px; }
+.site-footer .cols { display: grid; grid-template-columns: 1.4fr repeat(4, 1fr); gap: 28px; }
 @media (max-width: 760px) { .site-footer .cols { grid-template-columns: 1fr 1fr; } }
 .site-footer h4 { margin: 0 0 12px; font-size: var(--t-sm); color: var(--paper); text-transform: uppercase; letter-spacing: 0.08em; }
 .site-footer a { display: block; color: var(--fog); text-decoration: none; padding: 4px 0; }
@@ -581,3 +581,4 @@ dialog.modal .foot { display: flex; justify-content: flex-end; gap: 8px; padding
   .ledger li { animation: none; opacity: 1; transform: none; }
   .area { transition: none; }
 }
+.areas { display: grid; gap: 20px; }
