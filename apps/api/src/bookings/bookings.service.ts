@@ -17,6 +17,8 @@ import { QrService } from './qr.service';
 import { TxVerificationService } from './tx-verification.service';
 import { KycService } from '../kyc/kyc.service';
 import { ReceiptService } from './receipt.service';
+import { WalletsService } from '../wallets/wallets.service';
+import { ComplianceService } from '../compliance/compliance.service';
 
 export interface Actor {
   id: string;
@@ -49,6 +51,8 @@ export class BookingsService {
     private readonly txVerification: TxVerificationService,
     private readonly kyc: KycService,
     private readonly receipts: ReceiptService,
+    private readonly wallets: WalletsService,
+    private readonly compliance: ComplianceService,
     @Inject(ENV) private readonly env: Env,
   ) {
     this.rules = { cancelCutoffMin: env.CANCEL_CUTOFF_MIN, maxReschedules: env.MAX_RESCHEDULES };
@@ -142,6 +146,9 @@ export class BookingsService {
       { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 15_000 },
     );
 
+    // Reglas de cumplimiento (fraccionamiento, velocidad, wallets…): antes de la aprobación automática.
+    if (booking.exchange) await this.compliance.afterExchangeRequest(booking.userId, booking.id);
+
     // Cliente de confianza: la solicitud se aprueba sola (si no cumple algo, queda pendiente como siempre).
     if (booking.status === 'PENDING' && booking.exchange) {
       const auto = await this.autoApproveIfTrusted(booking, meta).catch((e) => {
@@ -203,12 +210,31 @@ export class BookingsService {
       if (risk === 'REVIEW' && !input.overrideWalletReview) {
         throw Errors.conflict('WALLET_REVIEW', 'La wallet necesita revisión. Revísala o marca la aprobación excepcional.');
       }
+      // Prueba de propiedad obligatoria por encima del umbral (normativa de transferencias a wallets propias).
+      const s = await this.prisma.exchangeSettings.findUnique({ where: { id: 1 } });
+      if (s && b.exchange.amount.gt(s.ownershipRequiredAbove) && !b.exchange.wallet.ownershipVerifiedAt) {
+        throw Errors.conflict(
+          'OWNERSHIP_REQUIRED',
+          `Por encima de ${s.ownershipRequiredAbove} ${b.exchange.asset} el cliente tiene que demostrar que la wallet es suya. Se le ha pedido desde su cita.`,
+        );
+      }
+      // Periodo de seguridad: no enviar cripto a una wallet recién añadida en una cuenta con actividad.
+      const until = b.exchange.direction === 'BUY_CRYPTO' ? await this.wallets.cooldownUntil(b.exchange.wallet) : null;
+      if (until && !input.overrideCooldown) {
+        throw Errors.conflict(
+          'WALLET_COOLDOWN',
+          `La wallet se añadió hace poco: el periodo de seguridad acaba el ${formatDateTime(until.toISOString(), b.location.timezone)}. Espera o marca la excepción si has confirmado con el cliente.`,
+        );
+      }
     }
     return this.dto(
       await this.applyApproval(b, {
         actorId: actor.id,
         input,
-        note: input.overrideWalletReview ? 'Aprobada con wallet en revisión (excepción)' : 'Aprobada',
+        note: (() => {
+          const ex = [input.overrideWalletReview && 'wallet en revisión', input.overrideCooldown && 'wallet en periodo de seguridad'].filter(Boolean);
+          return ex.length ? `Aprobada con ${ex.join(' y ')} (excepción)` : 'Aprobada';
+        })(),
         action: 'booking.approved',
         meta,
       }),
@@ -319,6 +345,10 @@ export class BookingsService {
       }),
     ]);
     if (completed < s.autoApproveMinCompleted) reasons.push(`menos de ${s.autoApproveMinCompleted} operaciones completadas`);
+    const full = await this.prisma.exchangeSettings.findUnique({ where: { id: 1 } });
+    if (full && ex.amount.gt(full.ownershipRequiredAbove) && !ex.wallet.ownershipVerifiedAt) reasons.push('propiedad de la wallet sin verificar');
+    if (ex.direction === 'BUY_CRYPTO' && (await this.wallets.cooldownUntil(ex.wallet))) reasons.push('wallet en periodo de seguridad');
+    if (await this.compliance.openCountForUser(b.userId)) reasons.push('alertas de cumplimiento abiertas');
     if (!walletUsed) reasons.push('wallet sin operaciones completadas');
     if (badTx) reasons.push('tiene transacciones que no cuadraron');
     return reasons;

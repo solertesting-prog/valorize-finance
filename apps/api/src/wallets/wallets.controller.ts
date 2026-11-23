@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   blockedAddressSchema,
@@ -6,6 +7,7 @@ import {
   exchangeSettingsSchema,
   paginationSchema,
   quoteQuerySchema,
+  walletOwnershipSchema,
   walletInputSchema,
   walletListQuerySchema,
   walletReviewSchema,
@@ -54,6 +56,23 @@ export class WalletsController {
   @Post('me/wallets')
   async add(@CurrentUser() u: AuthUser, @Body(new ZodPipe(walletInputSchema)) b: z.infer<typeof walletInputSchema>, @ReqMeta() meta: RequestMeta) {
     return this.wallets.customerDto(await this.wallets.upsertForUser(u.id, b, meta));
+  }
+
+  /** Mensaje para demostrar que la wallet es del cliente (firma) y alternativa por microtransferencia. */
+  @Get('me/wallets/:id/challenge')
+  challenge(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.wallets.challenge(u.id, id);
+  }
+
+  @Post('me/wallets/:id/ownership')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  verifyOwnership(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(walletOwnershipSchema)) b: z.infer<typeof walletOwnershipSchema>,
+    @ReqMeta() meta: RequestMeta,
+  ) {
+    return this.wallets.verifyOwnership(u.id, id, b, meta);
   }
 
   @ApiBearerAuth()

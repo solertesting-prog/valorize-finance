@@ -7,7 +7,8 @@ import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { QrPass, SlotPicker, StatusTracker } from '@/components/booking';
-import { ExchangeSummary, NetworkGuideBox, ReceiptButton } from '@/components/exchange';
+import { ExchangeSummary, NetworkGuideBox, ReceiptButton, useExchangeSettings } from '@/components/exchange';
+import { OwnershipModal } from '@/components/ownership';
 import { Alert, Button, ErrorBox, Modal, Spinner, TextInput, useToast } from '@/components/ui';
 import { api, authFetch } from '@/lib/api';
 
@@ -18,6 +19,8 @@ function BookingDetail() {
   const toast = useToast();
   const [mode, setMode] = useState<'none' | 'reschedule' | 'cancel'>('none');
   const [date, setDate] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const settings = useExchangeSettings();
   const [startsAt, setStartsAt] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 
@@ -79,6 +82,19 @@ function BookingDetail() {
         <div className="card stack">
           <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Tu operación</h2>
           <ExchangeSummary ex={b.exchange} />
+          {settings.data &&
+          ['PENDING', 'CONFIRMED'].includes(b.status) &&
+          !b.exchange.wallet.ownershipVerifiedAt &&
+          Number(b.exchange.amount) > Number(settings.data.ownershipRequiredAbove) ? (
+            <Alert kind="warn">
+              Para operaciones de más de {settings.data.ownershipRequiredAbove} {b.exchange.asset} tenemos que comprobar que la wallet es tuya. Solo tienes que
+              firmar un mensaje con ella: no se mueve ningún fondo.{' '}
+              <button className="btn sm primary" style={{ marginTop: 8 }} onClick={() => setVerifying(true)}>
+                Verificar mi wallet
+              </button>
+            </Alert>
+          ) : null}
+          {verifying ? <OwnershipModal walletId={b.exchange.wallet.id} onClose={() => setVerifying(false)} onDone={() => q.refetch()} /> : null}
           {b.status === 'COMPLETED' ? <ReceiptButton path={`/me/bookings/${b.id}/receipt-link`} /> : null}
           {['PENDING', 'CONFIRMED'].includes(b.status) ? (
             <NetworkGuideBox network={b.exchange.network} asset={b.exchange.asset} direction={b.exchange.direction}>

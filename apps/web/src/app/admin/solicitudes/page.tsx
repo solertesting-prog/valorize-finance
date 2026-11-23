@@ -97,6 +97,17 @@ export default function Approvals() {
                     </div>
                   ) : null}
                   {b.exchange ? <ExchangeSummary ex={b.exchange} staff /> : <p className="small muted">{b.service.name}</p>}
+                  {item.openAlerts ? (
+                    <Alert kind="error">
+                      El cliente tiene {item.openAlerts} alerta(s) de cumplimiento abiertas. <Link href="/admin/alertas">Revisarlas</Link>
+                    </Alert>
+                  ) : null}
+                  {item.ownershipRequired ? (
+                    <Alert kind="warn">Falta que el cliente demuestre que la wallet es suya (se le pide en su cita). Hasta entonces no se puede aprobar.</Alert>
+                  ) : null}
+                  {item.cooldownUntil ? (
+                    <Alert kind="warn">Wallet añadida recientemente: periodo de seguridad hasta el {new Date(item.cooldownUntil).toLocaleString('es-ES')}.</Alert>
+                  ) : null}
                   {item.autoApproveBlockers?.length ? (
                     <p className="xs muted" style={{ margin: 0 }}>
                       No se aprobó sola: {item.autoApproveBlockers.join(' · ')}.
@@ -140,7 +151,7 @@ function ApproveModal({ item, onClose }: { item: PendingApprovalDto; onClose: ()
   const ex = b.exchange;
   const risk = ex?.wallet.riskStatus;
   // Se parte de la cotización que vio el cliente; la oficina la ajusta si hace falta.
-  const [f, setF] = useState({ agreedRate: ex?.quotedRate ?? '', fiatAmount: '', feeAmount: '', note: '', override: false });
+  const [f, setF] = useState({ agreedRate: ex?.quotedRate ?? '', fiatAmount: '', feeAmount: '', note: '', override: false, cooldown: false });
   const fiat = f.agreedRate && ex ? (Number(ex.amount) * Number(f.agreedRate.replace(',', '.'))).toFixed(2) : '';
 
   const m = useMutation({
@@ -151,6 +162,7 @@ function ApproveModal({ item, onClose }: { item: PendingApprovalDto; onClose: ()
         feeAmount: f.feeAmount || undefined,
         note: f.note || undefined,
         overrideWalletReview: f.override,
+        overrideCooldown: f.cooldown,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin'] });
@@ -158,7 +170,8 @@ function ApproveModal({ item, onClose }: { item: PendingApprovalDto; onClose: ()
       onClose();
     },
   });
-  const blockedByRisk = risk === 'BLOCKED' || risk === 'PENDING' || (risk === 'REVIEW' && !f.override);
+  const blockedByRisk =
+    risk === 'BLOCKED' || risk === 'PENDING' || (risk === 'REVIEW' && !f.override) || !!item.ownershipRequired || (!!item.cooldownUntil && !f.cooldown);
 
   return (
     <Modal
@@ -183,6 +196,17 @@ function ApproveModal({ item, onClose }: { item: PendingApprovalDto; onClose: ()
             <label className="check" style={{ marginTop: 10 }}>
               <input type="checkbox" checked={f.override} onChange={(e) => setF({ ...f, override: e.target.checked })} />
               <span>Aprobar como excepción, bajo mi responsabilidad</span>
+            </label>
+          </Alert>
+        ) : null}
+        {item.ownershipRequired ? <Alert kind="error">Falta la prueba de propiedad de la wallet: no se puede aprobar todavía.</Alert> : null}
+        {item.cooldownUntil ? (
+          <Alert kind="warn">
+            La wallet está en periodo de seguridad hasta el {new Date(item.cooldownUntil).toLocaleString('es-ES')}. Apruébala antes solo si has confirmado con el
+            cliente que la ha añadido él.
+            <label className="check" style={{ marginTop: 10 }}>
+              <input type="checkbox" checked={f.cooldown} onChange={(e) => setF({ ...f, cooldown: e.target.checked })} />
+              <span>He confirmado con el cliente que la wallet es suya</span>
             </label>
           </Alert>
         ) : null}

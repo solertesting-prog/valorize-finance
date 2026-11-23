@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  AlertRule,
+  AlertStatus,
   BookingChannel,
   BookingStatus,
   ChainNetwork,
@@ -363,6 +365,8 @@ export const approveBookingSchema = z.object({
   note: z.string().trim().max(1000).optional(),
   /** Aprobar aunque la wallet esté en "Revisar" (queda registrado). */
   overrideWalletReview: z.boolean().default(false),
+  /** Aprobar un envío a una wallet recién añadida antes de que acabe el periodo de seguridad (queda registrado). */
+  overrideCooldown: z.boolean().default(false),
 });
 export type ApproveBookingInput = z.infer<typeof approveBookingSchema>;
 
@@ -394,6 +398,8 @@ export const exchangeSettingsSchema = z.object({
   autoApproveEnabled: z.boolean().default(false),
   autoApproveMaxAmount: amountString.default('1000'),
   autoApproveMinCompleted: z.number().int().min(1).max(100).default(2),
+  ownershipRequiredAbove: amountString.default('1000'),
+  walletCooldownHours: z.number().int().min(0).max(168).default(24),
   rateSource: z.enum(['AUTO', 'MANUAL']).default('AUTO'),
   manualRates: z
     .object({ USDT: z.string().trim().regex(/^\d{1,4}(\.\d{1,8})?$/, 'Tipo no válido').optional(), USDC: z.string().trim().regex(/^\d{1,4}(\.\d{1,8})?$/, 'Tipo no válido').optional() })
@@ -455,3 +461,29 @@ export const quoteQuerySchema = z.object({
   amount: amountString,
 });
 export type QuoteQuery = z.infer<typeof quoteQuerySchema>;
+
+/** Prueba de propiedad de una wallet: firma del mensaje o hash de la microtransferencia. */
+export const walletOwnershipSchema = z.discriminatedUnion('method', [
+  z.object({ method: z.literal('SIGNATURE'), signature: z.string().trim().regex(/^(0x)?[0-9a-fA-F]{130}$/, 'La firma debe tener 130 caracteres hexadecimales') }),
+  z.object({ method: z.literal('MICROTRANSFER'), txHash: txHashSchema }),
+]);
+export type WalletOwnershipInput = z.infer<typeof walletOwnershipSchema>;
+
+export const alertQuerySchema = paginationSchema.extend({
+  status: z.enum(values(AlertStatus)).optional(),
+  rule: z.enum(values(AlertRule)).optional(),
+  userId: z.string().uuid().optional(),
+});
+export type AlertQuery = z.infer<typeof alertQuerySchema>;
+
+export const alertUpdateSchema = z
+  .object({
+    status: z.enum(['IN_REVIEW', 'CLOSED']),
+    resolution: z.enum(['FALSE_POSITIVE', 'ACTION_TAKEN', 'REPORTED']).optional(),
+    note: z.string().trim().max(2000).optional(),
+  })
+  .refine((v) => v.status !== 'CLOSED' || (v.resolution && v.note && v.note.length >= 3), {
+    message: 'Para cerrar una alerta indica la resolución y una nota',
+    path: ['note'],
+  });
+export type AlertUpdateInput = z.infer<typeof alertUpdateSchema>;

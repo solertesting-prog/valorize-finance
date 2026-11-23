@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { Alert, Button, KycBadge, SelectInput, TextInput, useToast } from '@/components/ui';
+import { OwnershipBadge, OwnershipModal } from '@/components/ownership';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -124,6 +125,7 @@ export default function Profile() {
 
 function MyWallets() {
   const qc = useQueryClient();
+  const [verifying, setVerifying] = useState<string | null>(null);
   const q = useQuery({ queryKey: ['me', 'wallets', 'all'], queryFn: () => api.get<WalletDto[]>('/me/wallets') });
   const archive = useMutation({
     mutationFn: (id: string) => api.delete(`/me/wallets/${id}`),
@@ -143,11 +145,27 @@ function MyWallets() {
               {w.address}
             </div>
           </div>
-          <Button size="sm" variant="ghost" onClick={() => archive.mutate(w.id)}>
-            Quitar
-          </Button>
+          <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+            {w.ownershipVerifiedAt ? (
+              <OwnershipBadge wallet={w} />
+            ) : (
+              <Button size="sm" onClick={() => setVerifying(w.id)}>
+                Verificar
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => archive.mutate(w.id)}>
+              Quitar
+            </Button>
+          </div>
         </div>
       ))}
+      {q.data.some((w) => w.cooldownUntil) ? (
+        <p className="xs muted" style={{ margin: 0 }}>
+          Por seguridad, a una wallet recién añadida no enviamos cripto hasta que pasa el periodo de espera (
+          {new Date(q.data.find((w) => w.cooldownUntil)!.cooldownUntil!).toLocaleString('es-ES')}).
+        </p>
+      ) : null}
+      {verifying ? <OwnershipModal walletId={verifying} onClose={() => setVerifying(null)} /> : null}
       <p className="xs muted" style={{ margin: 0 }}>
         Puedes añadir otra wallet al solicitar un cambio.
       </p>

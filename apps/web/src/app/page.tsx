@@ -1,59 +1,160 @@
 'use client';
 
-import { CryptoAsset, ExchangeDirection } from '@valorize/shared';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { QuoteBox } from '@/components/quote';
-import { homeFor, useAuth } from '@/lib/auth';
+import { SitePage, Simulator } from '@/components/site';
+import { Icon } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
 
-const JOURNEY = [
-  ['Regístrate', 'Tu cuenta y los datos que necesitamos, una sola vez.'],
-  ['Elige oficina', 'La más cercana con hueco libre.'],
-  ['Reserva', 'Día, hora y gestión desde el móvil.'],
-  ['Recibe tu QR', 'Tu identificador único para esa cita.'],
-  ['Escanea y entra', 'Check-in en segundos al llegar.'],
+/** Cifras del producto (hechos verificables, no métricas de negocio). */
+const STATS = [
+  ['4', 'redes: TRON, Ethereum, Polygon y BNB Chain'],
+  ['2', 'stablecoins: USDT y USDC'],
+  ['100 %', 'de las wallets auditadas antes de operar'],
+  ['1 QR', 'por cita, validado en la oficina'],
+];
+
+const BENEFITS: [string, string, string][] = [
+  ['chart', 'Cotización al momento', 'Precio de mercado con el margen a la vista. Sabes cuánto recibes antes de reservar.'],
+  ['building', 'Oficinas físicas', 'Cambias cara a cara con nuestro equipo, no con un desconocido de internet.'],
+  ['shield', 'Wallets auditadas', 'Revisamos sanciones internacionales, bloqueos de Tether y Circle y el historial de cada wallet.'],
+  ['link', 'Comprobado en blockchain', 'Cada transacción se verifica en la red: importe, token, origen y destino.'],
+  ['doc', 'Justificante verificable', 'Recibes un PDF con código de verificación que cualquiera puede comprobar.'],
+  ['qr', 'Cita con QR', 'Reservas desde la web o la app y entras con tu QR, sin colas ni papeles.'],
+];
+
+const STEPS: [string, string][] = [
+  ['Crea tu cuenta', 'Regístrate y verifica tu identidad una sola vez.'],
+  ['Solicita tu cambio', 'Elige oficina, importe, red y tu wallet. Ves la cotización al momento.'],
+  ['Recibe tu QR', 'Revisamos la solicitud y la wallet. Al aprobarla, tu QR llega al móvil.'],
+  ['Cambia en la oficina', 'Muestras el QR, se completa la operación y te llevas el justificante.'],
+];
+
+const FAQ: [string, string][] = [
+  [
+    '¿Qué es Valorize Finance?',
+    'Una red de oficinas para cambiar USDT y USDC por euros (y euros por USDT o USDC) en persona, con cita previa. Todo el proceso se gestiona desde la web o la app.',
+  ],
+  [
+    '¿Por qué tengo que verificar mi identidad?',
+    'La normativa de prevención del blanqueo nos obliga a identificar a cada cliente. Lo haces una vez y sirve para todas tus operaciones mientras tu documento esté en vigor.',
+  ],
+  [
+    '¿Cómo sé cuánto voy a recibir?',
+    'El simulador te muestra la cotización orientativa con el tipo de mercado y nuestro margen. El importe final se confirma al aprobar la solicitud o en la oficina.',
+  ],
+  [
+    '¿Qué redes y monedas aceptáis?',
+    'USDT y USDC en TRON, Ethereum, Polygon y BNB Chain. Al pedir el cambio te guiamos para elegir la red correcta en tu wallet.',
+  ],
+  [
+    '¿Por qué revisáis mi wallet?',
+    'Comprobamos que no esté sancionada ni bloqueada y, en importes altos, que es tuya (firmando un mensaje con ella, sin mover fondos). Protege tu dinero y el de todos.',
+  ],
+  [
+    '¿Qué pasa si me equivoco de red?',
+    'Los fondos enviados por una red distinta se pueden perder. Por eso te pedimos confirmar la red antes de continuar y lo recordamos en tu cita.',
+  ],
+  [
+    '¿Cuánto tarda la aprobación?',
+    'Revisamos cada solicitud antes de la cita. Los clientes habituales con todo en regla pueden tener la aprobación al momento.',
+  ],
 ];
 
 export default function Landing() {
-  const { user, ready } = useAuth();
-  const router = useRouter();
-  useEffect(() => {
-    if (ready && user) router.replace(homeFor(user.role));
-  }, [ready, user, router]);
-
+  const { user } = useAuth();
+  const start = user ? '/app/reservar' : '/registro';
   return (
-    <div className="landing">
-      <div className="orb a" aria-hidden />
-      <div className="orb b" aria-hidden />
-      <header>
-        <span className="brand" style={{ lineHeight: 1.3 }}>
-          <b>VALORIZE</b>
-          <br />
-          FINANCE
-        </span>
-        <Link href="/login" className="btn ghost">
-          Entrar
-        </Link>
-      </header>
-
-      <section className="hero">
-        <div>
-          <h1>La experiencia presencial convertida en un proceso digital.</h1>
-          <p className="lede">
-            Reserva tu visita a una oficina de Valorize, lleva tu QR en el móvil y haz el check-in nada más llegar. Sin
-            llamadas ni colas.
-          </p>
-          <div className="row" style={{ marginTop: 28 }}>
-            <Link href="/registro" className="btn primary lg">
-              Reservar una visita
-            </Link>
-            <Link href="/login" className="btn lg">
-              Ya tengo cuenta
-            </Link>
+    <SitePage>
+      {/* Mensaje principal */}
+      <section className="s-hero">
+        <div className="glow" aria-hidden />
+        <div className="site-wrap grid2">
+          <div>
+            <span className="s-badge">Cambio presencial · Barcelona</span>
+            <h1>
+              Cambia cripto por euros, <em>cara a cara</em> y con todas las garantías.
+            </h1>
+            <p className="lede">
+              Vende o compra USDT y USDC en nuestras oficinas. Cotización al momento, wallet auditada y cada operación comprobada en la blockchain. Reserva desde
+              el móvil y entra con tu QR.
+            </p>
+            <div className="row" style={{ gap: 12 }}>
+              <Link href={start} className="btn primary lg">
+                Solicitar mi cambio
+              </Link>
+              <Link href="/p2p" className="btn lg">
+                Descubrir P2P
+              </Link>
+            </div>
+            <p className="note">Identidad verificada · Comisiones a la vista · Justificante en cada operación</p>
           </div>
-          <ol className="journey" aria-label="Cómo funciona">
-            {JOURNEY.map(([t, d]) => (
+          <Simulator />
+        </div>
+      </section>
+
+      {/* Cifras */}
+      <div className="site-wrap" style={{ marginBottom: 8 }}>
+        <div className="s-stats">
+          {STATS.map(([n, l]) => (
+            <div key={l}>
+              <div className="n">{n}</div>
+              <div className="l">{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Ventajas */}
+      <section className="s-section" id="seguridad">
+        <div className="site-wrap">
+          <div className="s-head">
+            <span className="kicker">Por qué Valorize</span>
+            <h2>La seguridad de una oficina. La comodidad de una app.</h2>
+            <p>Todo lo que necesitas para cambiar cripto sin riesgos innecesarios.</p>
+          </div>
+          <div className="s-cards">
+            {BENEFITS.map(([icon, t, d]) => (
+              <article key={t} className="s-card">
+                <div className="ico" aria-hidden>
+                  <Icon name={icon} size={22} />
+                </div>
+                <h3>{t}</h3>
+                <p>{d}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Acceso con identidad verificada */}
+      <section className="s-section alt">
+        <div className="site-wrap">
+          <div className="s-gate">
+            <div className="lock" aria-hidden>
+              <Icon name="shield" size={28} />
+            </div>
+            <h2>Solo con identidad verificada</h2>
+            <p>
+              Para proteger a nuestros clientes y cumplir la normativa, cada persona que opera con nosotros está identificada y cada wallet, revisada. Crea tu
+              cuenta y completa la verificación una sola vez.
+            </p>
+            <Link href={start} className="btn primary lg">
+              {user ? 'Solicitar un cambio' : 'Crear mi cuenta'}
+            </Link>
+            <div className="micro">Te avisamos en cuanto revisemos tu verificación.</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Cómo funciona */}
+      <section className="s-section" id="como-funciona">
+        <div className="site-wrap">
+          <div className="s-head">
+            <span className="kicker">Cómo funciona</span>
+            <h2>De la solicitud al cambio, en cuatro pasos</h2>
+          </div>
+          <ol className="s-steps">
+            {STEPS.map(([t, d]) => (
               <li key={t}>
                 <strong>{t}</strong>
                 <span>{d}</span>
@@ -61,99 +162,65 @@ export default function Landing() {
             ))}
           </ol>
         </div>
+      </section>
 
-        <div className="stack" style={{ alignItems: 'center' }}>
-          <Simulator />
-          <div className="phone" aria-hidden>
-          <div className="screen">
-            <div className="small" style={{ fontWeight: 700, marginBottom: 18 }}>
-              Mi QR
+      {/* Categoría P2P */}
+      <section className="s-section alt">
+        <div className="site-wrap">
+          <div className="s-cat">
+            <div>
+              <span className="kicker">Categoría</span>
+              <h2 style={{ fontSize: 'clamp(1.7rem, 3.2vw, 2.4rem)', margin: '10px 0 8px' }}>P2P: cambio presencial de stablecoins</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                Toda la plataforma de cambio de Valorize en un solo lugar: simulador, solicitud, oficinas, cita con QR y seguimiento de cada operación.
+              </p>
+              <ul>
+                <li>Compra y venta de USDT y USDC</li>
+                <li>Cuatro redes con guía para no equivocarte</li>
+                <li>Aprobación al momento para clientes habituales</li>
+                <li>Historial y justificantes en tu cuenta</li>
+              </ul>
             </div>
-            <div style={{ background: '#fff', borderRadius: 16, padding: 16, lineHeight: 0 }}>
-              <DemoQr />
+            <div className="stack" style={{ alignItems: 'stretch' }}>
+              <Link href="/p2p" className="btn primary lg">
+                Entrar en P2P
+              </Link>
+              <Link href={start} className="btn lg">
+                Solicitar mi cambio
+              </Link>
             </div>
-            <div className="center" style={{ marginTop: 18, fontWeight: 700 }}>
-              Reserva confirmada
-            </div>
-            <div className="center mono" style={{ color: 'var(--mint)', marginTop: 6 }}>
-              VF-2026-000458
-            </div>
-            <div className="center xs muted" style={{ marginTop: 6 }}>
-              Barcelona Centro, 11:30
-            </div>
-          </div>
           </div>
         </div>
       </section>
-    </div>
-  );
-}
 
-/** Simulador público: cuánto recibe o paga el cliente, con el tipo del día. */
-function Simulator() {
-  const [direction, setDirection] = useState<ExchangeDirection>('SELL_CRYPTO');
-  const [asset, setAsset] = useState<CryptoAsset>('USDT');
-  const [amount, setAmount] = useState('500');
-  return (
-    <section className="card stack simulator" aria-label="Simula tu cambio" style={{ width: '100%' }}>
-      <strong>Simula tu cambio</strong>
-      <div className="row" role="group" aria-label="Operación" style={{ gap: 8 }}>
-        <button type="button" className={`btn sm ${direction === 'SELL_CRYPTO' ? 'primary' : ''}`} aria-pressed={direction === 'SELL_CRYPTO'} onClick={() => setDirection('SELL_CRYPTO')}>
-          Vendo cripto
-        </button>
-        <button type="button" className={`btn sm ${direction === 'BUY_CRYPTO' ? 'primary' : ''}`} aria-pressed={direction === 'BUY_CRYPTO'} onClick={() => setDirection('BUY_CRYPTO')}>
-          Compro cripto
-        </button>
-      </div>
-      <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-        <input
-          className="input mono"
-          inputMode="decimal"
-          aria-label="Importe"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ''))}
-          style={{ fontSize: 'var(--t-lg)' }}
-        />
-        <select className="select" style={{ width: 'auto' }} value={asset} onChange={(e) => setAsset(e.target.value as CryptoAsset)} aria-label="Moneda">
-          <option value="USDT">USDT</option>
-          <option value="USDC">USDC</option>
-        </select>
-      </div>
-      <QuoteBox direction={direction} asset={asset} amount={amount} />
-      <Link href="/registro" className="btn primary">
-        Reservar mi cambio
-      </Link>
-    </section>
-  );
-}
+      {/* Preguntas */}
+      <section className="s-section" id="preguntas">
+        <div className="site-wrap">
+          <div className="s-head">
+            <span className="kicker">Preguntas frecuentes</span>
+            <h2>Lo que nos suelen preguntar</h2>
+          </div>
+          <div className="s-faq">
+            {FAQ.map(([q, a]) => (
+              <details key={q}>
+                <summary>{q}</summary>
+                <p>{a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
 
-/** QR decorativo (no codifica nada real) para la maqueta del hero. */
-function DemoQr() {
-  const n = 21;
-  const cells: [number, number][] = [];
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
-  const finder = (x: number, y: number) => (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
-  for (let y = 0; y < n; y++)
-    for (let x = 0; x < n; x++) {
-      if (finder(x, y)) continue;
-      if (rnd() > 0.52) cells.push([x, y]);
-    }
-  const Finder = ({ x, y }: { x: number; y: number }) => (
-    <g>
-      <rect x={x} y={y} width={7} height={7} fill="#07111c" />
-      <rect x={x + 1} y={y + 1} width={5} height={5} fill="#fff" />
-      <rect x={x + 2} y={y + 2} width={3} height={3} fill="#07111c" />
-    </g>
-  );
-  return (
-    <svg viewBox={`0 0 ${n} ${n}`} width="100%" shapeRendering="crispEdges">
-      {cells.map(([x, y]) => (
-        <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="#07111c" />
-      ))}
-      <Finder x={0} y={0} />
-      <Finder x={n - 7} y={0} />
-      <Finder x={0} y={n - 7} />
-    </svg>
+      {/* Llamada final */}
+      <section className="s-section alt s-cta">
+        <div className="site-wrap">
+          <h2>¿Listo para tu primer cambio?</h2>
+          <p>Crea tu cuenta, verifica tu identidad y reserva tu cita en la oficina más cercana.</p>
+          <Link href={start} className="btn primary lg">
+            {user ? 'Solicitar un cambio' : 'Empezar ahora'}
+          </Link>
+        </div>
+      </section>
+    </SitePage>
   );
 }

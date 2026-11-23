@@ -111,6 +111,7 @@ export const WebhookEvent = {
   BOOKING_REJECTED: 'booking.rejected',
   WALLET_SCREENED: 'wallet.screened',
   EXCHANGE_TX_VERIFIED: 'exchange.tx_verified',
+  COMPLIANCE_ALERT: 'compliance.alert',
   BOOKING_CONFIRMED: 'booking.confirmed',
   BOOKING_RESCHEDULED: 'booking.rescheduled',
   BOOKING_CANCELLED: 'booking.cancelled',
@@ -302,3 +303,37 @@ export function networkTips(network: ChainNetwork, asset: CryptoAsset, direction
   tips.push('Si envías por otra red, los fondos se pueden perder y no podremos recuperarlos.');
   return tips;
 }
+
+// ───────── Cumplimiento (prevención de blanqueo) ─────────
+
+export const AlertRule = {
+  STRUCTURING: 'STRUCTURING',
+  VELOCITY: 'VELOCITY',
+  MANY_WALLETS: 'MANY_WALLETS',
+  SHARED_WALLET: 'SHARED_WALLET',
+  BLOCKED_WALLET_ATTEMPT: 'BLOCKED_WALLET_ATTEMPT',
+  REPEATED_REJECTIONS: 'REPEATED_REJECTIONS',
+} as const;
+export type AlertRule = (typeof AlertRule)[keyof typeof AlertRule];
+export const ALERT_RULE_LABEL: Record<AlertRule, string> = {
+  STRUCTURING: 'Posible fraccionamiento de importes',
+  VELOCITY: 'Muchas solicitudes en poco tiempo',
+  MANY_WALLETS: 'Muchas wallets distintas',
+  SHARED_WALLET: 'Wallet compartida con otro cliente',
+  BLOCKED_WALLET_ATTEMPT: 'Intento con una wallet bloqueada',
+  REPEATED_REJECTIONS: 'Rechazos repetidos',
+};
+
+export const AlertSeverity = { LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH' } as const;
+export type AlertSeverity = (typeof AlertSeverity)[keyof typeof AlertSeverity];
+export const ALERT_SEVERITY_LABEL: Record<AlertSeverity, string> = { LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta' };
+
+export const AlertStatus = { OPEN: 'OPEN', IN_REVIEW: 'IN_REVIEW', CLOSED: 'CLOSED' } as const;
+export type AlertStatus = (typeof AlertStatus)[keyof typeof AlertStatus];
+export const ALERT_STATUS_LABEL: Record<AlertStatus, string> = { OPEN: 'Abierta', IN_REVIEW: 'En revisión', CLOSED: 'Cerrada' };
+
+export const ALERT_RESOLUTION_LABEL: Record<string, string> = {
+  FALSE_POSITIVE: 'Falso positivo',
+  ACTION_TAKEN: 'Medidas tomadas',
+  REPORTED: 'Comunicada al regulador',
+};

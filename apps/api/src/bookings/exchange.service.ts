@@ -9,6 +9,7 @@ import { PrismaService } from '../common/prisma.service';
 import { WalletScreeningService } from '../wallets/screening.service';
 import { WalletsService } from '../wallets/wallets.service';
 import { RatesService } from './rates.service';
+import { ComplianceService } from '../compliance/compliance.service';
 
 /** Estados que cuentan para los límites de importe (todo lo que no se ha caído). */
 const COUNTED = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE', 'COMPLETED'] as const;
@@ -40,6 +41,7 @@ export class ExchangeService {
     private readonly screening: WalletScreeningService,
     private readonly audit: AuditService,
     private readonly rates: RatesService,
+    private readonly compliance: ComplianceService,
   ) {}
 
   /** Validación y auditoría de wallet. Se hace fuera de la transacción porque consulta la blockchain. */
@@ -89,6 +91,7 @@ export class ExchangeService {
         metadata: { screeningId: result.id },
         meta,
       });
+      await this.compliance.blockedWalletAttempt(userId, wallet.network, wallet.address, wallet.id);
       // Mensaje deliberadamente genérico: no se revela el motivo (sanciones, listas…).
       throw Errors.unprocessable('WALLET_NOT_ACCEPTED', 'No podemos operar con esta wallet. Usa otra o contacta con nosotros.');
     }

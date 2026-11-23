@@ -186,6 +186,28 @@ export default function ExchangeSettingsPage() {
         </fieldset>
 
         <fieldset className="card stack" disabled={readOnly} style={{ margin: 0 }}>
+          <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Seguridad de las wallets</h2>
+          <div className="grid" style={{ '--min': '220px' } as React.CSSProperties}>
+            <TextInput
+              label="Prueba de propiedad a partir de"
+              inputMode="decimal"
+              value={f.ownershipRequiredAbove ?? ''}
+              onChange={(e) => setF({ ...f, ownershipRequiredAbove: e.target.value.replace(',', '.') })}
+              hint="USDT/USDC por operación. Por encima, el cliente firma con su wallet antes de la aprobación (normativa europea: 1.000 €)."
+            />
+            <TextInput
+              label="Periodo de seguridad de una wallet nueva (horas)"
+              type="number"
+              min={0}
+              max={168}
+              value={f.walletCooldownHours ?? 24}
+              onChange={(e) => setF({ ...f, walletCooldownHours: Number(e.target.value) })}
+              hint="Antes de enviar cripto a una wallet recién añadida en una cuenta con actividad. 0 = sin espera."
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="card stack" disabled={readOnly} style={{ margin: 0 }}>
           <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Aprobación automática</h2>
           <label className="check">
             <input type="checkbox" checked={!!f.autoApproveEnabled} onChange={(e) => setF({ ...f, autoApproveEnabled: e.target.checked })} />

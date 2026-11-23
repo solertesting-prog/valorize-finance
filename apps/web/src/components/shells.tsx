@@ -97,6 +97,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: '/admin/operaciones', label: 'Operaciones', icon: 'list' },
   { href: '/admin/citas', label: 'Citas', icon: 'calendar' },
   { href: '/admin/wallets', label: 'Wallets', icon: 'wallet' },
+  { href: '/admin/alertas', label: 'Alertas', icon: 'alert' },
   { href: '/admin/clientes', label: 'Clientes', icon: 'users' },
   { href: '/admin/verificaciones', label: 'Verificaciones', icon: 'shield' },
   { href: '/admin/ubicaciones', label: 'Ubicaciones', icon: 'building' },
@@ -116,6 +117,12 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
     enabled: ready && area === 'admin',
     refetchInterval: 60_000,
   });
+  const alerts = useQuery({
+    queryKey: ['admin', 'alerts', 'count'],
+    queryFn: () => api.get<{ open: number }>('/admin/alerts/count'),
+    enabled: ready && area === 'admin',
+    refetchInterval: 120_000,
+  });
   const { logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -123,6 +130,7 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
 
   const nav = (area === 'admin' ? ADMIN_NAV : STAFF_NAV).filter((n) => !n.roles || n.roles.includes(user.role));
   const pendingCount = pending.data?.length ?? 0;
+  const badge = (href: string) => (href === '/admin/solicitudes' ? pendingCount : href === '/admin/alertas' ? (alerts.data?.open ?? 0) : 0);
   const otherArea = area === 'admin' ? { href: '/panel', label: 'Ir al panel de atención' } : ADMIN_ROLES.includes(user.role) ? { href: '/admin', label: 'Ir al backoffice' } : null;
 
   return (
@@ -135,9 +143,9 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
           <Link key={n.href} href={n.href} className="nav" aria-current={isActive(pathname, n.href, n.exact) ? 'page' : undefined}>
             <Icon name={n.icon} />
             <span className="grow">{n.label}</span>
-            {n.href === '/admin/solicitudes' && pendingCount ? (
-              <span className="badge warn" aria-label={`${pendingCount} pendientes`}>
-                {pendingCount}
+            {badge(n.href) ? (
+              <span className={`badge ${n.href === '/admin/alertas' ? 'bad' : 'warn'}`} aria-label={`${badge(n.href)} pendientes`}>
+                {badge(n.href)}
               </span>
             ) : null}
           </Link>
@@ -177,7 +185,7 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
           {nav.map((n) => (
             <Link key={n.href} href={n.href} aria-current={isActive(pathname, n.href, n.exact) ? 'page' : undefined}>
               {n.label}
-              {n.href === '/admin/solicitudes' && pendingCount ? ` (${pendingCount})` : ''}
+              {badge(n.href) ? ` (${badge(n.href)})` : ''}
             </Link>
           ))}
         </nav>

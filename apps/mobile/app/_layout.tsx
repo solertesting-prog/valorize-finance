@@ -73,6 +73,7 @@ export default function RootLayout() {
             <Stack.Screen name="notifications" options={{ title: 'Notificaciones' }} />
             <Stack.Screen name="kyc" options={{ title: 'Verificación' }} />
             <Stack.Screen name="operations" options={{ title: 'Mis operaciones' }} />
+            <Stack.Screen name="wallet-verify" options={{ title: 'Verificar wallet' }} />
             <Stack.Screen name="security" options={{ title: 'Seguridad' }} />
           </Stack>
         </AuthProvider>

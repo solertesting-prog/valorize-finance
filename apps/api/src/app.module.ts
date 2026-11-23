@@ -36,6 +36,8 @@ import { TxVerificationService } from './bookings/tx-verification.service';
 import { RatesService } from './bookings/rates.service';
 import { ReceiptService } from './bookings/receipt.service';
 import { ReceiptsController } from './bookings/receipts.controller';
+import { ComplianceService } from './compliance/compliance.service';
+import { ComplianceController } from './compliance/compliance.controller';
 import { OnchainService } from './wallets/onchain.service';
 import { WalletScreeningService } from './wallets/screening.service';
 import { AdminWalletsController, WalletsController } from './wallets/wallets.controller';
@@ -75,6 +77,7 @@ import { WalletsService } from './wallets/wallets.service';
   ],
   controllers: [
     ReceiptsController,
+    ComplianceController,
     HealthController,
     MeController,
     FilesController,
@@ -110,6 +113,7 @@ import { WalletsService } from './wallets/wallets.service';
     TxVerificationService,
     RatesService,
     ReceiptService,
+    ComplianceService,
   ],
 })
 export class AppModule {}

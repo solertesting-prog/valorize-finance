@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ChainNetwork, CryptoWallet, Prisma, WalletRiskStatus } from '@prisma/client';
-import type { AdminWalletDetailDto, AdminWalletDto, ExchangeSettingsDto, ExchangeSettingsInput, WalletDto } from '@valorize/shared';
+import type { AdminWalletDetailDto, AdminWalletDto, ExchangeSettingsDto, ExchangeSettingsInput, WalletChallengeDto, WalletDto, WalletOwnershipInput } from '@valorize/shared';
+import { randomBytes } from 'crypto';
 import { AuditService } from '../common/audit.service';
 import { ENV, Env } from '../config/env';
 import { RequestMeta } from '../common/auth.decorators';
@@ -9,6 +10,14 @@ import { PrismaService } from '../common/prisma.service';
 import { parseAddress } from './address';
 import { readManual } from '../bookings/rates.service';
 import { WalletScreeningService } from './screening.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { TOKENS } from './chains';
+import { keccak256 } from './keccak';
+import { OnchainService } from './onchain.service';
+import { recoverSigner } from './signature';
+
+/** Validez del mensaje de prueba de propiedad. */
+const CHALLENGE_TTL_MS = 24 * 3600_000;
 
 /** Listas OFAC de direcciones por activo, mantenidas a diario a partir del SDN oficial. */
 const OFAC_SOURCES = ['ETH', 'TRX', 'USDT', 'USDC', 'BSC', 'ARB'].map(
@@ -26,14 +35,19 @@ export class WalletsService {
     private readonly screening: WalletScreeningService,
     private readonly audit: AuditService,
     @Inject(ENV) private readonly env: Env,
+    private readonly notifications: NotificationsService,
+    private readonly onchain: OnchainService,
   ) {}
 
   // ─────────── Cliente ───────────
 
   /** Para el cliente, "Bloqueada" se muestra como "Revisar": no se revela el motivo del bloqueo. */
-  customerDto(w: CryptoWallet): WalletDto {
+  customerDto(w: CryptoWallet, cooldownUntil: Date | null = null): WalletDto {
     const status: WalletRiskStatus = w.riskStatus === 'BLOCKED' ? 'REVIEW' : w.riskStatus;
     return {
+      ownershipVerifiedAt: w.ownershipVerifiedAt?.toISOString() ?? null,
+      ownershipMethod: (w.ownershipMethod as WalletDto['ownershipMethod']) ?? null,
+      cooldownUntil: cooldownUntil?.toISOString() ?? null,
       id: w.id,
       network: w.network,
       address: parseAddress(w.network, w.address).display,
@@ -54,7 +68,119 @@ export class WalletsService {
       where: { userId, archivedAt: null, ...(network ? { network } : {}) },
       orderBy: { createdAt: 'desc' },
     });
-    return ws.map((w) => this.customerDto(w));
+    return Promise.all(ws.map(async (w) => this.customerDto(w, await this.cooldownUntil(w))));
+  }
+
+  /**
+   * Periodo de seguridad de una wallet recién añadida: si la cuenta ya tenía operaciones u otras wallets,
+   * no se envía cripto a una wallet nueva hasta pasadas N horas (si alguien roba la cuenta y cambia la wallet,
+   * el cliente tiene tiempo de verlo: se le avisa por email). Devuelve hasta cuándo, o null si no aplica.
+   */
+  async cooldownUntil(w: Pick<CryptoWallet, 'id' | 'userId' | 'createdAt'>): Promise<Date | null> {
+    const s = await this.prisma.exchangeSettings.findUnique({ where: { id: 1 } });
+    const hours = s?.walletCooldownHours ?? 24;
+    const end = new Date(w.createdAt.getTime() + hours * 3600_000);
+    if (!hours || end <= new Date()) return null;
+    return (await this.isEstablished(w.userId, w.createdAt, w.id)) ? end : null;
+  }
+
+  /** ¿La cuenta ya tenía actividad antes de esa fecha (operaciones completadas u otras wallets)? */
+  private async isEstablished(userId: string, before: Date, exceptWalletId?: string) {
+    const [ops, wallets] = await Promise.all([
+      this.prisma.booking.count({ where: { userId, status: 'COMPLETED', exchange: { isNot: null }, completedAt: { lt: before } } }),
+      this.prisma.cryptoWallet.count({ where: { userId, createdAt: { lt: before }, ...(exceptWalletId ? { id: { not: exceptWalletId } } : {}) } }),
+    ]);
+    return ops > 0 || wallets > 0;
+  }
+
+  // ─────────── Prueba de propiedad ───────────
+
+  /** Mensaje a firmar (y, si hay dirección de Valorize en esa red, la microtransferencia alternativa). */
+  async challenge(userId: string, walletId: string): Promise<WalletChallengeDto> {
+    const w = await this.ownedOrThrow(userId, walletId);
+    const fresh = w.ownershipChallenge && w.ownershipChallengeAt && Date.now() - w.ownershipChallengeAt.getTime() < CHALLENGE_TTL_MS / 2;
+    let message = w.ownershipChallenge;
+    let at = w.ownershipChallengeAt;
+    if (!fresh || !message || !at) {
+      at = new Date();
+      const display = parseAddress(w.network, w.address).display;
+      message = [
+        'Valorize Finance - prueba de propiedad',
+        `Wallet: ${display}`,
+        `Red: ${w.network}`,
+        `Codigo: ${randomBytes(6).toString('hex').toUpperCase()}`,
+        `Fecha: ${at.toISOString()}`,
+      ].join('\n');
+      await this.prisma.cryptoWallet.update({ where: { id: w.id }, data: { ownershipChallenge: message, ownershipChallengeAt: at } });
+    }
+    return {
+      walletId: w.id,
+      network: w.network,
+      address: parseAddress(w.network, w.address).display,
+      message,
+      signatureKind: w.network === 'TRON' ? 'tron' : 'evm',
+      microtransfer: await this.microtransfer(w.network, message),
+      expiresAt: new Date(at.getTime() + CHALLENGE_TTL_MS).toISOString(),
+    };
+  }
+
+  /** Microtransferencia: importe único (0,010000–0,019999) derivado del mensaje, a la primera dirección de Valorize de la red. */
+  private async microtransfer(network: ChainNetwork, message: string) {
+    const to = (await this.receivingAddresses())[network]?.[0];
+    const asset = TOKENS[network].USDT ? ('USDT' as const) : TOKENS[network].USDC ? ('USDC' as const) : null;
+    if (!to || !asset) return null;
+    const n = parseInt(keccak256(message).slice(0, 8), 16) % 10_000;
+    return { asset, amount: (0.01 + n / 1_000_000).toFixed(6), toAddress: parseAddress(network, to).display };
+  }
+
+  async verifyOwnership(userId: string, walletId: string, input: WalletOwnershipInput, meta: RequestMeta): Promise<WalletDto> {
+    const w = await this.ownedOrThrow(userId, walletId);
+    if (w.ownershipVerifiedAt) return this.customerDto(w, await this.cooldownUntil(w));
+    if (!w.ownershipChallenge || !w.ownershipChallengeAt || Date.now() - w.ownershipChallengeAt.getTime() > CHALLENGE_TTL_MS) {
+      throw Errors.unprocessable('CHALLENGE_EXPIRED', 'El mensaje ha caducado. Vuelve a abrir la verificación para generar uno nuevo.');
+    }
+    const message = w.ownershipChallenge;
+    let proof: Record<string, unknown>;
+
+    if (input.method === 'SIGNATURE') {
+      const signer = recoverSigner(w.network === 'TRON' ? 'tron' : 'evm', message, input.signature);
+      const ok = !!signer && parseAddress(w.network, signer).canonical === w.address;
+      if (!ok) {
+        await this.audit.log({ actorId: userId, action: 'wallet.ownership_failed', entityType: 'wallet', entityId: w.id, metadata: { method: 'SIGNATURE' }, meta });
+        throw Errors.unprocessable('SIGNATURE_INVALID', 'La firma no corresponde a esta wallet. Comprueba que firmas el mensaje exacto con la misma wallet.');
+      }
+      proof = { method: 'SIGNATURE', message, signature: input.signature };
+    } else {
+      const mt = await this.microtransfer(w.network, message);
+      if (!mt) throw Errors.unprocessable('MICROTRANSFER_UNAVAILABLE', 'La verificación por transferencia no está disponible en esta red.');
+      const token = TOKENS[w.network][mt.asset]!;
+      const tx = await this.onchain.lookupTx(w.network, input.txHash).catch(() => null);
+      if (!tx || tx.state !== 'success') {
+        throw Errors.unprocessable('TX_NOT_CONFIRMED', 'Todavía no vemos la transferencia confirmada en la red. Espera un minuto y vuelve a intentarlo.');
+      }
+      const tokenAddr = parseAddress(w.network, token.address).canonical;
+      const to = parseAddress(w.network, mt.toAddress).canonical;
+      const expected = BigInt(Math.round(Number(mt.amount) * 10 ** token.decimals));
+      const match = tx.transfers.find((t) => t.token === tokenAddr && t.from === w.address && t.to === to && t.raw === expected);
+      if (!match) {
+        await this.audit.log({ actorId: userId, action: 'wallet.ownership_failed', entityType: 'wallet', entityId: w.id, metadata: { method: 'MICROTRANSFER', txHash: input.txHash }, meta });
+        throw Errors.unprocessable('TX_MISMATCH', `La transferencia no coincide: debe salir de esta wallet y enviar exactamente ${mt.amount} ${mt.asset} a ${mt.toAddress}.`);
+      }
+      proof = { method: 'MICROTRANSFER', message, txHash: input.txHash, amount: mt.amount, asset: mt.asset, to: mt.toAddress };
+    }
+
+    const updated = await this.prisma.cryptoWallet.update({
+      where: { id: w.id },
+      data: {
+        ownershipVerifiedAt: new Date(),
+        ownershipMethod: input.method,
+        ownershipProof: proof as Prisma.InputJsonValue,
+        ownershipChallenge: null,
+        ownershipChallengeAt: null,
+      },
+    });
+    await this.audit.log({ actorId: userId, action: 'wallet.ownership_verified', entityType: 'wallet', entityId: w.id, metadata: { method: input.method }, meta });
+    return this.customerDto(updated, await this.cooldownUntil(updated));
   }
 
   /** Registra (o reutiliza) una wallet del cliente. Valida formato y checksum. */
@@ -74,6 +200,17 @@ export class WalletsService {
       data: { userId, network: input.network, address: parsed.canonical, label: input.label },
     });
     await this.audit.log({ actorId: userId, action: 'wallet.added', entityType: 'wallet', entityId: w.id, metadata: { network: w.network }, meta });
+    // Aviso de seguridad si la cuenta ya tenía actividad: si no ha sido el cliente, lo verá a tiempo.
+    if (await this.isEstablished(userId, w.createdAt, w.id)) {
+      const s = await this.prisma.exchangeSettings.findUnique({ where: { id: 1 } });
+      void this.notifications.notify({
+        userId,
+        type: 'SECURITY',
+        title: 'Nueva wallet en tu cuenta',
+        body: `Se ha añadido la wallet ${parsed.display} (${w.network}) a tu cuenta.${s?.walletCooldownHours ? ` Por seguridad, no te enviaremos cripto a ella hasta dentro de ${s.walletCooldownHours} horas.` : ''} Si no has sido tú, cambia tu contraseña y contacta con nosotros.`,
+        email: { cta: { label: 'Revisar mi cuenta', url: `${this.env.APP_URL}/app/perfil` } },
+      });
+    }
     return w;
   }
 
@@ -284,6 +421,8 @@ export class WalletsService {
       monthlyLimitPerUser: s.monthlyLimitPerUser.toString(),
       enhancedKycAbove: s.enhancedKycAbove.toString(),
       minWalletAgeDays: s.minWalletAgeDays,
+      ownershipRequiredAbove: s.ownershipRequiredAbove.toString(),
+      walletCooldownHours: s.walletCooldownHours,
       openscanUrl: this.env.OPENSCAN_URL,
       ...(admin
         ? {

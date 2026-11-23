@@ -27,6 +27,7 @@ import { bookingInclude } from '../bookings/booking.mapper';
 import { BookingsService } from '../bookings/bookings.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { WalletsService } from '../wallets/wallets.service';
+import { ComplianceService } from '../compliance/compliance.service';
 import { AdminUsersService } from './admin-users.service';
 import { AnalyticsService } from './analytics.service';
 
@@ -44,6 +45,7 @@ export class AdminController {
     private readonly analytics: AnalyticsService,
     private readonly webhooks: WebhooksService,
     private readonly wallets: WalletsService,
+    private readonly compliance: ComplianceService,
   ) {}
 
   // ─────────── Aprobación de solicitudes ───────────
@@ -58,6 +60,9 @@ export class AdminController {
         screening: b.exchange ? await this.wallets.latestScreening(b.exchange.walletId) : null,
         // Por qué no se aprobó sola (solo si la aprobación automática está activada).
         autoApproveBlockers: settings?.autoApproveEnabled && b.exchange ? await this.bookings.autoApproveBlockers(b, settings) : undefined,
+        openAlerts: await this.compliance.openCountForUser(b.userId),
+        ownershipRequired: !!(b.exchange && settings && b.exchange.amount.gt(settings.ownershipRequiredAbove) && !b.exchange.wallet.ownershipVerifiedAt),
+        cooldownUntil: b.exchange?.direction === 'BUY_CRYPTO' ? ((await this.wallets.cooldownUntil(b.exchange.wallet))?.toISOString() ?? null) : null,
       })),
     );
   }

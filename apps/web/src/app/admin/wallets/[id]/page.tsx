@@ -15,6 +15,7 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { ScreeningChecks, ScreeningHeader, WalletRiskBadge } from '@/components/exchange';
 import { ExplorerButtons, OpenScanViewer, TxCheckBadge } from '@/components/openscan';
+import { OwnershipBadge } from '@/components/ownership';
 import { Alert, Button, ErrorBox, Modal, Spinner, TextArea, useToast } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -66,6 +67,7 @@ export default function WalletDetail() {
         </div>
         <div className="row">
           <WalletRiskBadge status={w.riskStatus} score={w.riskScore} />
+          <OwnershipBadge wallet={w} />
           <ExplorerButtons network={w.network} kind="address" value={w.address} />
         </div>
       </div>

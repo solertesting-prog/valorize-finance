@@ -189,6 +189,8 @@ model User {
   approvals          Booking[]            @relation("BookingApprovedBy")
   wallets            CryptoWallet[]
   walletReviews      WalletScreening[]    @relation("ScreeningReviewer")
+  complianceAlerts   ComplianceAlert[]    @relation("AlertCustomer")
+  alertReviews       ComplianceAlert[]    @relation("AlertReviewer")
   bookingEvents      BookingEvent[]
   notifications      Notification[]
   devices            PushDevice[]
@@ -651,6 +653,12 @@ model CryptoWallet {
   riskStatus   WalletRiskStatus @default(PENDING)
   riskScore    Int?
   lastScreenedAt DateTime?
+  /// Prueba de propiedad (firma del mensaje o microtransferencia) exigida por encima de un importe.
+  ownershipVerifiedAt  DateTime?
+  ownershipMethod      String?   @db.VarChar(20) // SIGNATURE | MICROTRANSFER
+  ownershipProof       Json?
+  ownershipChallenge   String?   @db.VarChar(400)
+  ownershipChallengeAt DateTime?
   archivedAt   DateTime?
   createdAt    DateTime         @default(now())
 
@@ -698,6 +706,51 @@ model BlockedAddress {
 }
 
 /// Configuración del servicio de cambio (fila única id = 1).
+enum AlertRule {
+  STRUCTURING
+  VELOCITY
+  MANY_WALLETS
+  SHARED_WALLET
+  BLOCKED_WALLET_ATTEMPT
+  REPEATED_REJECTIONS
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AlertStatus {
+  OPEN
+  IN_REVIEW
+  CLOSED
+}
+
+/// Alerta de cumplimiento (prevención de blanqueo): patrón sospechoso detectado automáticamente.
+model ComplianceAlert {
+  id           String        @id @default(uuid()) @db.Uuid
+  userId       String        @db.Uuid
+  user         User          @relation("AlertCustomer", fields: [userId], references: [id], onDelete: Cascade)
+  bookingId    String?       @db.Uuid
+  walletId     String?       @db.Uuid
+  rule         AlertRule
+  severity     AlertSeverity
+  status       AlertStatus   @default(OPEN)
+  details      Json
+  resolution   String?       @db.VarChar(30) // FALSE_POSITIVE | ACTION_TAKEN | REPORTED
+  note         String?       @db.VarChar(2000)
+  reviewedById String?       @db.Uuid
+  reviewedBy   User?         @relation("AlertReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, rule, status])
+  @@map("compliance_alerts")
+}
+
 enum BookingChannel {
   WEB
   APP
@@ -731,6 +784,10 @@ model ExchangeSettings {
   autoApproveEnabled      Boolean @default(false)
   autoApproveMaxAmount    Decimal @default(1000) @db.Decimal(20, 6)
   autoApproveMinCompleted Int     @default(2)
+  /// Por encima de este importe la wallet debe estar verificada como propia del cliente.
+  ownershipRequiredAbove  Decimal @default(1000) @db.Decimal(20, 6)
+  /// Horas de espera antes de enviar cripto a una wallet recién añadida (protección ante robo de cuenta).
+  walletCooldownHours     Int     @default(24)
   /// Cotización: AUTO = precio de mercado (CoinGecko) con respaldo manual; MANUAL = solo el tipo fijado.
   rateSource         String         @default("AUTO") @db.VarChar(10)
   /// Tipo medio manual en EUR por unidad: { "USDT": "0.92", "USDC": "0.92" }

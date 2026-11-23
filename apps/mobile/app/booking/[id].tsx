@@ -1,10 +1,10 @@
 import { BookingDto, errorMessage, todayIn } from '@valorize/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { QrPass, SlotPicker, StatusTracker } from '@/components/booking';
-import { ExchangeSummary, NetworkGuideBox } from '@/components/exchange';
+import { ExchangeSummary, NetworkGuideBox, useExchangeSettings } from '@/components/exchange';
 import { c } from '@/theme';
 import { Body, Button, Card, Field, H2, Loader, Muted, Notice, Screen } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -33,6 +33,7 @@ export default function BookingScreen() {
   };
   const reschedule = useMutation({ mutationFn: () => api.post<BookingDto>(`/me/bookings/${id}/reschedule`, { startsAt }), onSuccess: (nb) => after(nb.status === 'PENDING' ? 'Cita cambiada. La revisaremos de nuevo.' : 'Cita cambiada. Tu QR se ha actualizado.')(nb) });
   // Enlace firmado de 5 minutos: se abre en el navegador del móvil, que descarga o muestra el PDF.
+  const settings = useExchangeSettings();
   const receipt = useMutation({
     mutationFn: () => api.post<{ url: string }>(`/me/bookings/${id}/receipt-link`),
     onSuccess: (r) => void Linking.openURL(r.url),
@@ -57,6 +58,12 @@ export default function BookingScreen() {
         <Card>
           <H2>Tu operación</H2>
           <ExchangeSummary ex={b.exchange} />
+          {settings.data && ['PENDING', 'CONFIRMED'].includes(b.status) && !b.exchange.wallet.ownershipVerifiedAt && Number(b.exchange.amount) > Number(settings.data.ownershipRequiredAbove) ? (
+            <Notice kind="warn">{`Para operaciones de más de ${settings.data.ownershipRequiredAbove} ${b.exchange.asset} tenemos que comprobar que la wallet es tuya. Solo tienes que firmar un mensaje con ella.`}</Notice>
+          ) : null}
+          {settings.data && ['PENDING', 'CONFIRMED'].includes(b.status) && !b.exchange.wallet.ownershipVerifiedAt && Number(b.exchange.amount) > Number(settings.data.ownershipRequiredAbove) ? (
+            <Button title="Verificar mi wallet" variant="primary" onPress={() => router.push(`/wallet-verify?id=${b.exchange!.wallet.id}`)} />
+          ) : null}
           {b.status === 'COMPLETED' ? (
             <Button
               title="Descargar justificante (PDF)"

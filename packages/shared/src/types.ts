@@ -1,4 +1,7 @@
 import type {
+  AlertRule,
+  AlertSeverity,
+  AlertStatus,
   BookingChannel,
   TxCheckStatus,
   BookingStatus,
@@ -360,6 +363,41 @@ export interface WalletDto {
   riskStatus: WalletRiskStatus;
   riskScore: number | null;
   lastScreenedAt: string | null;
+  /** Propiedad verificada (firma o microtransferencia). */
+  ownershipVerifiedAt: string | null;
+  ownershipMethod: 'SIGNATURE' | 'MICROTRANSFER' | null;
+  /** Fin del periodo de seguridad de una wallet recién añadida (null si ya pasó). */
+  cooldownUntil: string | null;
+  createdAt: string;
+}
+
+/** Reto para demostrar que una wallet es del cliente. */
+export interface WalletChallengeDto {
+  walletId: string;
+  network: ChainNetwork;
+  address: string;
+  /** Mensaje exacto que hay que firmar con la wallet. */
+  message: string;
+  /** Firma desde el navegador o la app de la wallet: "evm" (personal_sign) o "tron" (signMessageV2). */
+  signatureKind: 'evm' | 'tron';
+  /** Alternativa: enviar exactamente esta cantidad a esta dirección de Valorize. */
+  microtransfer: { asset: CryptoAsset; amount: string; toAddress: string } | null;
+  expiresAt: string;
+}
+
+export interface ComplianceAlertDto {
+  id: string;
+  rule: AlertRule;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  details: Record<string, unknown>;
+  resolution: string | null;
+  note: string | null;
+  customer: { id: string; name: string; email: string };
+  bookingId: string | null;
+  walletId: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
   createdAt: string;
 }
 
@@ -455,6 +493,10 @@ export interface ExchangeSettingsDto {
   monthlyLimitPerUser: string;
   enhancedKycAbove: string;
   minWalletAgeDays: number;
+  /** Por encima de este importe hay que demostrar que la wallet es propia. */
+  ownershipRequiredAbove: string;
+  /** Horas de espera antes de enviar cripto a una wallet recién añadida. */
+  walletCooldownHours: number;
   /** Aprobación automática para clientes de confianza (solo backoffice). */
   autoApproveEnabled?: boolean;
   autoApproveMaxAmount?: string;
@@ -476,6 +518,12 @@ export interface PendingApprovalDto {
   screening: WalletScreeningDto | null;
   /** Motivos por los que no se aprobó automáticamente. */
   autoApproveBlockers?: string[];
+  /** Alertas de cumplimiento abiertas del cliente. */
+  openAlerts?: number;
+  /** Falta la prueba de propiedad de la wallet (importe por encima del umbral). */
+  ownershipRequired?: boolean;
+  /** Fin del periodo de seguridad de la wallet (solo compras). */
+  cooldownUntil?: string | null;
 }
 
 /** Cotización orientativa de una operación. El precio final se fija en la oficina. */

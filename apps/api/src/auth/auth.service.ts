@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { VerificationChannel } from '@prisma/client';
 import type { AuthTokensDto, LoginResultDto, RegisterInput, SessionDto } from '@valorize/shared';
 import { WebhookEvent } from '@valorize/shared';
 import { AuditService } from '../common/audit.service';
+import { ENV, Env } from '../config/env';
+import { deviceLabel } from '../common/device';
 import { RequestMeta } from '../common/auth.decorators';
 import { CryptoService } from '../common/crypto.service';
 import { Errors } from '../common/errors';
@@ -36,6 +38,7 @@ export class AuthService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly webhooks: WebhooksService,
+    @Inject(ENV) private readonly env: Env,
   ) {
     this.dummyHash = this.crypto.hashPassword('dummy-password-for-timing');
   }
@@ -144,7 +147,35 @@ export class AuthService {
     return this.completeLogin(userId, client, meta);
   }
 
+  /**
+   * Aviso de inicio de sesión desde un dispositivo nuevo: si el usuario ya había entrado antes
+   * y nunca desde este navegador/app en los últimos 180 días, se le avisa (notificación y email).
+   */
+  private async warnIfNewDevice(userId: string, client: string, meta: RequestMeta) {
+    const since = new Date(Date.now() - 180 * 86_400_000);
+    const previous = await this.prisma.session.findMany({
+      where: { userId, createdAt: { gte: since } },
+      select: { userAgent: true, client: true },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    if (!previous.length) return; // primer acceso: nada que comparar
+    const current = deviceLabel(meta.userAgent, client);
+    if (previous.some((p) => deviceLabel(p.userAgent, p.client) === current)) return;
+    const when = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Madrid' }).format(new Date());
+    await this.audit.log({ actorId: userId, action: 'auth.new_device', entityType: 'user', entityId: userId, metadata: { device: current }, meta });
+    void this.notifications.notify({
+      userId,
+      type: 'SECURITY',
+      title: 'Nuevo inicio de sesión',
+      body: `Se ha iniciado sesión en tu cuenta desde ${current}${meta.ip ? ` (IP ${meta.ip})` : ''} el ${when}. Si no has sido tú, cierra esa sesión y cambia tu contraseña desde Seguridad.`,
+      data: { device: current },
+      email: { cta: { label: 'Revisar mis sesiones', url: `${this.env.APP_URL}/cuenta/seguridad` } },
+    });
+  }
+
   private async completeLogin(userId: string, client: string, meta: RequestMeta) {
+    await this.warnIfNewDevice(userId, client, meta).catch(() => undefined);
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
