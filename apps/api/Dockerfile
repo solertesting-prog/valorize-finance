@@ -29,4 +29,5 @@ EXPOSE 4000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s CMD node -e "fetch('http://127.0.0.1:4000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["/usr/bin/tini", "--"]
 # Aplica migraciones pendientes y arranca.
-CMD ["sh", "-c", "npx prisma migrate deploy --schema prisma/schema.prisma && node dist/main.js"]
+# El compilador SWC deja el punto de entrada en dist/src/main.js (dist/main.js con tsc).
+CMD ["sh", "-c", "npx prisma migrate deploy --schema prisma/schema.prisma && node $(test -f dist/main.js && echo dist/main.js || echo dist/src/main.js)"]

@@ -5,7 +5,7 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "start": "node dist/main.js",
+    "start": "node $(test -f dist/main.js && echo dist/main.js || echo dist/src/main.js)",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest",
     "test:e2e": "jest --config test/jest-e2e.json --runInBand",
