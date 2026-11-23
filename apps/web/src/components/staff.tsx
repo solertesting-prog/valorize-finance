@@ -68,7 +68,7 @@ export function AgendaTable({ bookings }: { bookings: BookingDto[] }) {
                 {formatTime(b.startsAt, b.location.timezone)}
               </td>
               <td className="mono">
-                <Link href={`/panel/citas/${b.id}`}>{b.reference}</Link>
+                <Link href={`/p2p/panel/citas/${b.id}`}>{b.reference}</Link>
               </td>
               <td>
                 {b.customer?.firstName} {b.customer?.lastName}

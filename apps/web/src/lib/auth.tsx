@@ -70,9 +70,9 @@ export function useAuth() {
 }
 
 export function homeFor(role: Role): string {
-  if (ADMIN_ROLES.includes(role)) return '/admin';
-  if (STAFF_ROLES.includes(role)) return '/panel';
-  return '/app';
+  if (ADMIN_ROLES.includes(role)) return '/p2p/admin';
+  if (STAFF_ROLES.includes(role)) return '/p2p/panel';
+  return '/p2p/app';
 }
 
 /** Protege una zona: redirige a login o a la zona propia del rol. */
@@ -84,7 +84,7 @@ export function useRequireRole(roles: Role[] | 'any') {
     if (!ready) return;
     if (!user) {
       const next = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
-      router.replace(`/login?next=${encodeURIComponent(next)}`);
+      router.replace(`/p2p/login?next=${encodeURIComponent(next)}`);
     } else if (!allowed) {
       router.replace(homeFor(user.role));
     }

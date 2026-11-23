@@ -42,6 +42,14 @@ export default {
     // La web y la API comparten origen: la cookie de sesión es SameSite=Strict y no hace falta CORS.
     return [{ source: '/api/v1/:path*', destination: `${API_INTERNAL_URL}/v1/:path*` }];
   },
+  async redirects() {
+    // Toda la plataforma de cambio vive en /p2p. Los enlaces antiguos (QR, justificantes en PDF, emails) siguen funcionando.
+    const moved = ['app', 'panel', 'admin', 'login', 'registro', 'recuperar', 'verificar', 'cuenta', 'justificante', 'q'];
+    return moved.flatMap((d) => [
+      { source: `/${d}`, destination: `/p2p/${d}`, permanent: false },
+      { source: `/${d}/:path*`, destination: `/p2p/${d}/:path*`, permanent: false },
+    ]);
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

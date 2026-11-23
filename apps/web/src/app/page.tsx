@@ -1,99 +1,130 @@
 'use client';
 
+import { LocationDto } from '@valorize/shared';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { SitePage, Simulator } from '@/components/site';
+import { SitePage } from '@/components/site';
 import { Icon } from '@/components/ui';
+import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
-/** Cifras del producto (hechos verificables, no métricas de negocio). */
-const STATS = [
-  ['4', 'redes: TRON, Ethereum, Polygon y BNB Chain'],
+/** Hechos del producto, no métricas comerciales. */
+const STATS: [string, string][] = [
+  ['4', 'redes blockchain soportadas'],
   ['2', 'stablecoins: USDT y USDC'],
-  ['100 %', 'de las wallets auditadas antes de operar'],
-  ['1 QR', 'por cita, validado en la oficina'],
+  ['100 %', 'de clientes con identidad verificada'],
+  ['1', 'justificante verificable por operación'],
 ];
 
-const BENEFITS: [string, string, string][] = [
-  ['chart', 'Cotización al momento', 'Precio de mercado con el margen a la vista. Sabes cuánto recibes antes de reservar.'],
-  ['building', 'Oficinas físicas', 'Cambias cara a cara con nuestro equipo, no con un desconocido de internet.'],
-  ['shield', 'Wallets auditadas', 'Revisamos sanciones internacionales, bloqueos de Tether y Circle y el historial de cada wallet.'],
-  ['link', 'Comprobado en blockchain', 'Cada transacción se verifica en la red: importe, token, origen y destino.'],
-  ['doc', 'Justificante verificable', 'Recibes un PDF con código de verificación que cualquiera puede comprobar.'],
-  ['qr', 'Cita con QR', 'Reservas desde la web o la app y entras con tu QR, sin colas ni papeles.'],
-];
+const RAILS = ['TRON', 'Ethereum', 'Polygon', 'BNB Chain', 'USDT', 'USDC', 'OFAC', 'MiCA'];
 
-const STEPS: [string, string][] = [
-  ['Crea tu cuenta', 'Regístrate y verifica tu identidad una sola vez.'],
-  ['Solicita tu cambio', 'Elige oficina, importe, red y tu wallet. Ves la cotización al momento.'],
-  ['Recibe tu QR', 'Revisamos la solicitud y la wallet. Al aprobarla, tu QR llega al móvil.'],
-  ['Cambia en la oficina', 'Muestras el QR, se completa la operación y te llevas el justificante.'],
+/** Lo que hace distinta a Valorize. */
+const PRINCIPLES: [string, string, string][] = [
+  ['building', 'Presencia física', 'Oficinas reales y un equipo al que puedes mirar a la cara. Lo digital, con alguien detrás que responde.'],
+  ['users', 'Clientes identificados', 'Cada persona que opera con nosotros está verificada. Es la base de la confianza entre todos.'],
+  ['shield', 'Cumplimiento desde el diseño', 'Control de sanciones, prueba de titularidad de wallets y alertas de riesgo integradas en cada flujo.'],
+  ['link', 'Todo comprobado en la red', 'No damos nada por bueno sin verlo en la blockchain: importe, token, origen y destino.'],
+  ['chart', 'Precios a la vista', 'Cotización de mercado y margen explícito antes de comprometerte. Sin letra pequeña.'],
+  ['doc', 'Trazabilidad completa', 'Registro de auditoría inalterable y justificantes que cualquiera puede verificar.'],
 ];
 
 const FAQ: [string, string][] = [
   [
     '¿Qué es Valorize Finance?',
-    'Una red de oficinas para cambiar USDT y USDC por euros (y euros por USDT o USDC) en persona, con cita previa. Todo el proceso se gestiona desde la web o la app.',
+    'Una empresa de servicios financieros con activos digitales que combina tecnología propia con atención presencial. Nuestro primer servicio es P2P, el cambio presencial de USDT y USDC por euros.',
   ],
   [
-    '¿Por qué tengo que verificar mi identidad?',
-    'La normativa de prevención del blanqueo nos obliga a identificar a cada cliente. Lo haces una vez y sirve para todas tus operaciones mientras tu documento esté en vigor.',
+    '¿Qué es la categoría P2P?',
+    'Es nuestra plataforma de cambio presencial: simulas la cotización, solicitas el cambio desde la web o la app, recibes un QR y completas la operación en una oficina con nuestro equipo.',
   ],
   [
-    '¿Cómo sé cuánto voy a recibir?',
-    'El simulador te muestra la cotización orientativa con el tipo de mercado y nuestro margen. El importe final se confirma al aprobar la solicitud o en la oficina.',
+    '¿Por qué pedís verificar la identidad?',
+    'La normativa europea de prevención del blanqueo exige identificar a cada cliente. Lo haces una sola vez y te sirve para operar mientras tu documento esté en vigor.',
   ],
   [
-    '¿Qué redes y monedas aceptáis?',
-    'USDT y USDC en TRON, Ethereum, Polygon y BNB Chain. Al pedir el cambio te guiamos para elegir la red correcta en tu wallet.',
+    '¿Dónde estáis?',
+    'Puedes ver nuestras oficinas y su dirección en la sección de contacto de esta página y en P2P, donde también puedes reservar cita.',
   ],
   [
-    '¿Por qué revisáis mi wallet?',
-    'Comprobamos que no esté sancionada ni bloqueada y, en importes altos, que es tuya (firmando un mensaje con ella, sin mover fondos). Protege tu dinero y el de todos.',
-  ],
-  [
-    '¿Qué pasa si me equivoco de red?',
-    'Los fondos enviados por una red distinta se pueden perder. Por eso te pedimos confirmar la red antes de continuar y lo recordamos en tu cita.',
-  ],
-  [
-    '¿Cuánto tarda la aprobación?',
-    'Revisamos cada solicitud antes de la cita. Los clientes habituales con todo en regla pueden tener la aprobación al momento.',
+    '¿Es esto asesoramiento financiero?',
+    'No. Prestamos servicios de cambio y te damos información clara para que decidas tú. Operar con criptoactivos conlleva riesgos.',
   ],
 ];
 
-export default function Landing() {
+const CHECKS: [string, string][] = [
+  ['Identidad', 'verificada'],
+  ['Wallet', 'auditada'],
+  ['Transacción', 'comprobada en la red'],
+  ['Justificante', 'emitido'],
+];
+
+export default function ValorizeHome() {
   const { user } = useAuth();
-  const start = user ? '/app/reservar' : '/registro';
+  const access = user ? '/p2p' : '/p2p/registro';
+  const locs = useQuery({ queryKey: ['locations', 'public'], queryFn: () => api.get<LocationDto[]>('/locations') });
+
   return (
     <SitePage>
       {/* Mensaje principal */}
-      <section className="s-hero">
+      <section className="s-hero corp">
         <div className="glow" aria-hidden />
+        <div className="grid-lines" aria-hidden />
         <div className="site-wrap grid2">
           <div>
-            <span className="s-badge">Cambio presencial · Barcelona</span>
+            <span className="s-badge">Valorize Finance · Barcelona</span>
             <h1>
-              Cambia cripto por euros, <em>cara a cara</em> y con todas las garantías.
+              Finanzas digitales con <em>los pies en la tierra</em>.
             </h1>
             <p className="lede">
-              Vende o compra USDT y USDC en nuestras oficinas. Cotización al momento, wallet auditada y cada operación comprobada en la blockchain. Reserva desde
-              el móvil y entra con tu QR.
+              Unimos la tecnología de los activos digitales con la seguridad de una oficina física. Clientes identificados, operaciones comprobadas en la blockchain
+              y personas reales al otro lado.
             </p>
             <div className="row" style={{ gap: 12 }}>
-              <Link href={start} className="btn primary lg">
-                Solicitar mi cambio
+              <Link href={access} className="btn primary lg">
+                {user ? 'Ir a P2P' : 'Solicitar acceso'}
               </Link>
               <Link href="/p2p" className="btn lg">
-                Descubrir P2P
+                Conocer P2P
               </Link>
             </div>
-            <p className="note">Identidad verificada · Comisiones a la vista · Justificante en cada operación</p>
+            <p className="note">Acceso solo para clientes con identidad verificada</p>
           </div>
-          <Simulator />
+
+          <aside className="ledger" aria-label="Cómo garantizamos cada operación">
+            <div className="ledger-head">
+              <span className="mono">VALORIZE · CONTROL DE OPERACIÓN</span>
+              <span className="dot" aria-hidden />
+            </div>
+            <ol>
+              {CHECKS.map(([k, v], i) => (
+                <li key={k} style={{ animationDelay: `${0.25 + i * 0.35}s` }}>
+                  <span className="tick" aria-hidden>
+                    <Icon name="check" size={16} />
+                  </span>
+                  <span>
+                    <strong>{k}</strong> {v}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <div className="ledger-foot mono">Así es cada operación en Valorize.</div>
+          </aside>
         </div>
       </section>
 
+      {/* Tira de redes y estándares, en lugar de logos de socios */}
+      <div className="rails" aria-label="Redes, monedas y estándares con los que trabajamos">
+        <div className="rails-track">
+          {[...RAILS, ...RAILS].map((r, i) => (
+            <span key={i} aria-hidden={i >= RAILS.length}>
+              {r}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* Cifras */}
-      <div className="site-wrap" style={{ marginBottom: 8 }}>
+      <div className="site-wrap" style={{ marginTop: 40 }}>
         <div className="s-stats">
           {STATS.map(([n, l]) => (
             <div key={l}>
@@ -104,16 +135,68 @@ export default function Landing() {
         </div>
       </div>
 
-      {/* Ventajas */}
-      <section className="s-section" id="seguridad">
+      {/* Nosotros */}
+      <section className="s-section" id="nosotros">
+        <div className="site-wrap about">
+          <div>
+            <span className="kicker">Nosotros</span>
+            <h2>Hacemos que operar con activos digitales sea tan fiable como ir al banco.</h2>
+          </div>
+          <div className="stack">
+            <p>
+              Valorize Finance nace de una idea sencilla: el dinero digital necesita la misma confianza que el de siempre. Por eso combinamos una plataforma
+              propia, que comprueba cada wallet y cada transacción, con oficinas donde atendemos en persona.
+            </p>
+            <p>
+              Trabajamos solo con clientes identificados, aplicamos controles de cumplimiento en cada paso y dejamos constancia de todo. Así protegemos tu
+              dinero y el de toda la comunidad.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Categorías */}
+      <section className="s-section alt" id="servicios">
         <div className="site-wrap">
           <div className="s-head">
-            <span className="kicker">Por qué Valorize</span>
-            <h2>La seguridad de una oficina. La comodidad de una app.</h2>
-            <p>Todo lo que necesitas para cambiar cripto sin riesgos innecesarios.</p>
+            <span className="kicker">Nuestros servicios</span>
+            <h2>Una plataforma, organizada por categorías</h2>
+            <p>Cada servicio de Valorize vive en su propia categoría, con su acceso y sus herramientas.</p>
+          </div>
+          <Link href="/p2p" className="area">
+            <div className="area-main">
+              <span className="badge ok">Disponible</span>
+              <h3>P2P</h3>
+              <p className="area-sub">Cambio presencial de USDT y USDC por euros</p>
+              <p className="muted">
+                Simula la cotización, solicita tu cambio desde la web o la app, recibe tu QR y completa la operación en nuestra oficina. Con aprobación al
+                momento para clientes habituales, historial y justificantes.
+              </p>
+              <span className="area-cta">
+                Entrar en P2P <span aria-hidden>→</span>
+              </span>
+            </div>
+            <ul className="area-list">
+              <li>Compra y venta de stablecoins</li>
+              <li>TRON, Ethereum, Polygon y BNB Chain</li>
+              <li>Cita con QR en la oficina</li>
+              <li>Wallets auditadas y verificadas</li>
+              <li>Justificante en PDF verificable</li>
+              <li>Web y app móvil</li>
+            </ul>
+          </Link>
+        </div>
+      </section>
+
+      {/* Principios */}
+      <section className="s-section" id="principios">
+        <div className="site-wrap">
+          <div className="s-head">
+            <span className="kicker">Cómo trabajamos</span>
+            <h2>Seis principios que no negociamos</h2>
           </div>
           <div className="s-cards">
-            {BENEFITS.map(([icon, t, d]) => (
+            {PRINCIPLES.map(([icon, t, d]) => (
               <article key={t} className="s-card">
                 <div className="ico" aria-hidden>
                   <Icon name={icon} size={22} />
@@ -126,68 +209,23 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Acceso con identidad verificada */}
+      {/* Acceso */}
       <section className="s-section alt">
         <div className="site-wrap">
           <div className="s-gate">
             <div className="lock" aria-hidden>
               <Icon name="shield" size={28} />
             </div>
-            <h2>Solo con identidad verificada</h2>
+            <h2>Acceso solo para clientes verificados</h2>
             <p>
-              Para proteger a nuestros clientes y cumplir la normativa, cada persona que opera con nosotros está identificada y cada wallet, revisada. Crea tu
-              cuenta y completa la verificación una sola vez.
+              Valorize no es una plataforma anónima. Para operar, creas tu cuenta y verificas tu identidad una sola vez. A cambio, sabes que todas las personas
+              con las que operamos también lo están.
             </p>
-            <Link href={start} className="btn primary lg">
-              {user ? 'Solicitar un cambio' : 'Crear mi cuenta'}
+            <Link href={access} className="btn primary lg">
+              {user ? 'Ir a P2P' : 'Solicitar acceso'}
             </Link>
-            <div className="micro">Te avisamos en cuanto revisemos tu verificación.</div>
-          </div>
-        </div>
-      </section>
-
-      {/* Cómo funciona */}
-      <section className="s-section" id="como-funciona">
-        <div className="site-wrap">
-          <div className="s-head">
-            <span className="kicker">Cómo funciona</span>
-            <h2>De la solicitud al cambio, en cuatro pasos</h2>
-          </div>
-          <ol className="s-steps">
-            {STEPS.map(([t, d]) => (
-              <li key={t}>
-                <strong>{t}</strong>
-                <span>{d}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* Categoría P2P */}
-      <section className="s-section alt">
-        <div className="site-wrap">
-          <div className="s-cat">
-            <div>
-              <span className="kicker">Categoría</span>
-              <h2 style={{ fontSize: 'clamp(1.7rem, 3.2vw, 2.4rem)', margin: '10px 0 8px' }}>P2P: cambio presencial de stablecoins</h2>
-              <p className="muted" style={{ margin: 0 }}>
-                Toda la plataforma de cambio de Valorize en un solo lugar: simulador, solicitud, oficinas, cita con QR y seguimiento de cada operación.
-              </p>
-              <ul>
-                <li>Compra y venta de USDT y USDC</li>
-                <li>Cuatro redes con guía para no equivocarte</li>
-                <li>Aprobación al momento para clientes habituales</li>
-                <li>Historial y justificantes en tu cuenta</li>
-              </ul>
-            </div>
-            <div className="stack" style={{ alignItems: 'stretch' }}>
-              <Link href="/p2p" className="btn primary lg">
-                Entrar en P2P
-              </Link>
-              <Link href={start} className="btn lg">
-                Solicitar mi cambio
-              </Link>
+            <div className="micro">
+              ¿Ya tienes cuenta? <Link href="/p2p/login">Entra aquí</Link>
             </div>
           </div>
         </div>
@@ -211,13 +249,44 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Llamada final */}
-      <section className="s-section alt s-cta">
+      {/* Contacto */}
+      <section className="s-section alt" id="contacto">
         <div className="site-wrap">
-          <h2>¿Listo para tu primer cambio?</h2>
-          <p>Crea tu cuenta, verifica tu identidad y reserva tu cita en la oficina más cercana.</p>
-          <Link href={start} className="btn primary lg">
-            {user ? 'Solicitar un cambio' : 'Empezar ahora'}
+          <div className="s-head">
+            <span className="kicker">Contacto</span>
+            <h2>Ven a vernos</h2>
+            <p>Atendemos con cita previa. Resérvala desde P2P y te esperamos en la oficina.</p>
+          </div>
+          {locs.data?.length ? (
+            <div className="s-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+              {locs.data.map((l) => (
+                <article key={l.id} className="s-card">
+                  <div className="ico" aria-hidden>
+                    <Icon name="pin" size={22} />
+                  </div>
+                  <h3>{l.name}</h3>
+                  <p>
+                    {l.address}, {l.city}
+                  </p>
+                  <Link href={user ? `/p2p/app/reservar?location=${l.id}` : '/p2p/registro'} className="btn sm" style={{ marginTop: 14 }}>
+                    Reservar cita
+                  </Link>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="center muted">{locs.isLoading ? 'Cargando oficinas…' : 'Pronto anunciaremos nuestras oficinas.'}</p>
+          )}
+        </div>
+      </section>
+
+      {/* Llamada final */}
+      <section className="s-section s-cta">
+        <div className="site-wrap">
+          <h2>Opera con la tranquilidad de saber con quién lo haces</h2>
+          <p>Crea tu cuenta, verifica tu identidad y empieza con P2P.</p>
+          <Link href={access} className="btn primary lg">
+            {user ? 'Ir a P2P' : 'Solicitar acceso'}
           </Link>
         </div>
       </section>

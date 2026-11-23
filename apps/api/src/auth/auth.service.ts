@@ -170,7 +170,7 @@ export class AuthService {
       title: 'Nuevo inicio de sesión',
       body: `Se ha iniciado sesión en tu cuenta desde ${current}${meta.ip ? ` (IP ${meta.ip})` : ''} el ${when}. Si no has sido tú, cierra esa sesión y cambia tu contraseña desde Seguridad.`,
       data: { device: current },
-      email: { cta: { label: 'Revisar mis sesiones', url: `${this.env.APP_URL}/cuenta/seguridad` } },
+      email: { cta: { label: 'Revisar mis sesiones', url: `${this.env.APP_URL}/p2p/cuenta/seguridad` } },
     });
   }
 

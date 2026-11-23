@@ -208,7 +208,7 @@ export class WalletsService {
         type: 'SECURITY',
         title: 'Nueva wallet en tu cuenta',
         body: `Se ha añadido la wallet ${parsed.display} (${w.network}) a tu cuenta.${s?.walletCooldownHours ? ` Por seguridad, no te enviaremos cripto a ella hasta dentro de ${s.walletCooldownHours} horas.` : ''} Si no has sido tú, cambia tu contraseña y contacta con nosotros.`,
-        email: { cta: { label: 'Revisar mi cuenta', url: `${this.env.APP_URL}/app/perfil` } },
+        email: { cta: { label: 'Revisar mi cuenta', url: `${this.env.APP_URL}/p2p/app/perfil` } },
       });
     }
     return w;

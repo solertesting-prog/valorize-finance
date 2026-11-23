@@ -16,11 +16,11 @@ function isActive(pathname: string, href: string, exact = false) {
 // ─────────────────────────── Cliente ───────────────────────────
 
 const CUSTOMER_NAV = [
-  { href: '/app', label: 'Inicio', icon: 'home', exact: true },
-  { href: '/app/ubicaciones', label: 'Ubicaciones', icon: 'pin' },
-  { href: '/app/reservas', label: 'Mis citas', icon: 'qr' },
-  { href: '/app/operaciones', label: 'Operaciones', icon: 'wallet' },
-  { href: '/app/perfil', label: 'Perfil', icon: 'user' },
+  { href: '/p2p/app', label: 'Inicio', icon: 'home', exact: true },
+  { href: '/p2p/app/ubicaciones', label: 'Ubicaciones', icon: 'pin' },
+  { href: '/p2p/app/reservas', label: 'Mis citas', icon: 'qr' },
+  { href: '/p2p/app/operaciones', label: 'Operaciones', icon: 'wallet' },
+  { href: '/p2p/app/perfil', label: 'Perfil', icon: 'user' },
 ];
 
 export function CustomerShell({ children }: { children: ReactNode }) {
@@ -42,7 +42,7 @@ export function CustomerShell({ children }: { children: ReactNode }) {
         Saltar al contenido
       </a>
       <header className="app-top">
-        <Link href="/app" className="brand">
+        <Link href="/p2p/app" className="brand">
           <b>VALORIZE</b> FINANCE
         </Link>
         <nav className="app-nav-desktop" aria-label="Principal">
@@ -53,7 +53,7 @@ export function CustomerShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <Link
-          href="/app/notificaciones"
+          href="/p2p/app/notificaciones"
           className="btn ghost bell"
           aria-label={count ? `Notificaciones, ${count} sin leer` : 'Notificaciones'}
         >
@@ -85,28 +85,28 @@ interface NavItem {
 }
 
 const STAFF_NAV: NavItem[] = [
-  { href: '/panel', label: 'Hoy', icon: 'home', exact: true },
-  { href: '/panel/escanear', label: 'Escanear QR', icon: 'scan' },
-  { href: '/panel/agenda', label: 'Citas', icon: 'calendar' },
-  { href: '/panel/incidencias', label: 'Incidencias', icon: 'alert' },
+  { href: '/p2p/panel', label: 'Hoy', icon: 'home', exact: true },
+  { href: '/p2p/panel/escanear', label: 'Escanear QR', icon: 'scan' },
+  { href: '/p2p/panel/agenda', label: 'Citas', icon: 'calendar' },
+  { href: '/p2p/panel/incidencias', label: 'Incidencias', icon: 'alert' },
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { href: '/admin', label: 'Analítica', icon: 'chart', exact: true },
-  { href: '/admin/solicitudes', label: 'Solicitudes', icon: 'inbox' },
-  { href: '/admin/operaciones', label: 'Operaciones', icon: 'list' },
-  { href: '/admin/citas', label: 'Citas', icon: 'calendar' },
-  { href: '/admin/wallets', label: 'Wallets', icon: 'wallet' },
-  { href: '/admin/alertas', label: 'Alertas', icon: 'alert' },
-  { href: '/admin/clientes', label: 'Clientes', icon: 'users' },
-  { href: '/admin/verificaciones', label: 'Verificaciones', icon: 'shield' },
-  { href: '/admin/ubicaciones', label: 'Ubicaciones', icon: 'building' },
-  { href: '/admin/servicios', label: 'Servicios', icon: 'tag' },
-  { href: '/admin/cambio', label: 'Cambio cripto', icon: 'sliders' },
-  { href: '/admin/equipo', label: 'Equipo y roles', icon: 'user' },
-  { href: '/admin/requisitos-kyc', label: 'Requisitos KYC', icon: 'doc', roles: ['ADMIN'] },
-  { href: '/admin/webhooks', label: 'Webhooks', icon: 'link', roles: ['ADMIN'] },
-  { href: '/admin/auditoria', label: 'Auditoría', icon: 'log', roles: ['ADMIN'] },
+  { href: '/p2p/admin', label: 'Analítica', icon: 'chart', exact: true },
+  { href: '/p2p/admin/solicitudes', label: 'Solicitudes', icon: 'inbox' },
+  { href: '/p2p/admin/operaciones', label: 'Operaciones', icon: 'list' },
+  { href: '/p2p/admin/citas', label: 'Citas', icon: 'calendar' },
+  { href: '/p2p/admin/wallets', label: 'Wallets', icon: 'wallet' },
+  { href: '/p2p/admin/alertas', label: 'Alertas', icon: 'alert' },
+  { href: '/p2p/admin/clientes', label: 'Clientes', icon: 'users' },
+  { href: '/p2p/admin/verificaciones', label: 'Verificaciones', icon: 'shield' },
+  { href: '/p2p/admin/ubicaciones', label: 'Ubicaciones', icon: 'building' },
+  { href: '/p2p/admin/servicios', label: 'Servicios', icon: 'tag' },
+  { href: '/p2p/admin/cambio', label: 'Cambio cripto', icon: 'sliders' },
+  { href: '/p2p/admin/equipo', label: 'Equipo y roles', icon: 'user' },
+  { href: '/p2p/admin/requisitos-kyc', label: 'Requisitos KYC', icon: 'doc', roles: ['ADMIN'] },
+  { href: '/p2p/admin/webhooks', label: 'Webhooks', icon: 'link', roles: ['ADMIN'] },
+  { href: '/p2p/admin/auditoria', label: 'Auditoría', icon: 'log', roles: ['ADMIN'] },
 ];
 
 export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin'; children: ReactNode; toolbar?: ReactNode }) {
@@ -130,13 +130,13 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
 
   const nav = (area === 'admin' ? ADMIN_NAV : STAFF_NAV).filter((n) => !n.roles || n.roles.includes(user.role));
   const pendingCount = pending.data?.length ?? 0;
-  const badge = (href: string) => (href === '/admin/solicitudes' ? pendingCount : href === '/admin/alertas' ? (alerts.data?.open ?? 0) : 0);
-  const otherArea = area === 'admin' ? { href: '/panel', label: 'Ir al panel de atención' } : ADMIN_ROLES.includes(user.role) ? { href: '/admin', label: 'Ir al backoffice' } : null;
+  const badge = (href: string) => (href === '/p2p/admin/solicitudes' ? pendingCount : href === '/p2p/admin/alertas' ? (alerts.data?.open ?? 0) : 0);
+  const otherArea = area === 'admin' ? { href: '/p2p/panel', label: 'Ir al panel de atención' } : ADMIN_ROLES.includes(user.role) ? { href: '/p2p/admin', label: 'Ir al backoffice' } : null;
 
   return (
     <div className="ops">
       <aside className="ops-side" aria-label="Navegación">
-        <Link href={area === 'admin' ? '/admin' : '/panel'} className="brand">
+        <Link href={area === 'admin' ? '/p2p/admin' : '/p2p/panel'} className="brand">
           VALORIZE
         </Link>
         {nav.map((n) => (
@@ -144,7 +144,7 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
             <Icon name={n.icon} />
             <span className="grow">{n.label}</span>
             {badge(n.href) ? (
-              <span className={`badge ${n.href === '/admin/alertas' ? 'bad' : 'warn'}`} aria-label={`${badge(n.href)} pendientes`}>
+              <span className={`badge ${n.href === '/p2p/admin/alertas' ? 'bad' : 'warn'}`} aria-label={`${badge(n.href)} pendientes`}>
                 {badge(n.href)}
               </span>
             ) : null}
@@ -167,7 +167,7 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
             style={{ paddingLeft: 0, marginTop: 8 }}
             onClick={async () => {
               await logout();
-              router.replace('/login');
+              router.replace('/p2p/login');
             }}
           >
             <Icon name="logout" size={16} /> Cerrar sesión
@@ -176,7 +176,7 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
       </aside>
       <div className="ops-main">
         <div className="ops-top">
-          <Link href={area === 'admin' ? '/admin' : '/panel'} className="brand" style={{ color: 'var(--mint)', textDecoration: 'none' }}>
+          <Link href={area === 'admin' ? '/p2p/admin' : '/p2p/panel'} className="brand" style={{ color: 'var(--mint)', textDecoration: 'none' }}>
             <span className="ops-brand-mobile">VALORIZE</span>
           </Link>
           <div className="row">{toolbar}</div>
@@ -194,7 +194,7 @@ export function OpsShell({ area, children, toolbar }: { area: 'panel' | 'admin';
             <div className="page" style={{ paddingBottom: 0 }}>
               <div className="alert warn">
                 El personal debe tener activada la verificación en dos pasos.{' '}
-                <Link href="/cuenta/seguridad">Actívala ahora</Link>.
+                <Link href="/p2p/cuenta/seguridad">Actívala ahora</Link>.
               </div>
             </div>
           ) : null}

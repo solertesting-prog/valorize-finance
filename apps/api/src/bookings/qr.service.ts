@@ -33,7 +33,7 @@ export class QrService {
    * y cualquier otra persona solo ve que es un pase de Valorize, sin datos.
    */
   url(token: string): string {
-    return `${this.env.APP_URL.replace(/\/+$/, '')}/q/${token}`;
+    return `${this.env.APP_URL.replace(/\/+$/, '')}/p2p/q/${token}`;
   }
 
   /** Acepta el token tal cual o el enlace completo del QR. */

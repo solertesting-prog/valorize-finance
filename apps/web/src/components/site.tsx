@@ -8,66 +8,86 @@ import { homeFor, useAuth } from '@/lib/auth';
 import { QuoteBox } from './quote';
 import { Icon } from './ui';
 
-/** Categorías del sitio público. P2P agrupa toda la plataforma de cambio presencial. */
-const NAV = [
+type NavItem = { href: string; label: string; cat?: boolean };
+
+/** Web oficial de Valorize Finance: P2P es una de sus categorías. */
+export const CORPORATE_NAV: NavItem[] = [
   { href: '/p2p', label: 'P2P', cat: true },
-  { href: '/#como-funciona', label: 'Cómo funciona' },
-  { href: '/#seguridad', label: 'Seguridad' },
+  { href: '/#nosotros', label: 'Nosotros' },
+  { href: '/#principios', label: 'Cómo trabajamos' },
   { href: '/#preguntas', label: 'Preguntas' },
+  { href: '/#contacto', label: 'Contacto' },
 ];
 
-export function SiteHeader() {
+/** Navegación dentro de la categoría P2P. */
+export const P2P_NAV: NavItem[] = [
+  { href: '/p2p#simulador', label: 'Simulador' },
+  { href: '/p2p#proceso', label: 'Cómo funciona' },
+  { href: '/p2p#seguridad', label: 'Seguridad' },
+  { href: '/p2p#oficinas', label: 'Oficinas' },
+];
+
+export function SiteHeader({ nav = CORPORATE_NAV, section }: { nav?: NavItem[]; section?: string }) {
   const { user, ready } = useAuth();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const all = section ? [...nav, { href: '/', label: 'Valorize Finance' }] : nav;
   return (
-    <>
-      <header className="site-header">
-        <div className="site-wrap">
-          <Link href="/" className="brand" style={{ textDecoration: 'none', color: 'var(--paper)' }} aria-label="Valorize Finance, inicio">
-            <b>VALORIZE</b> FINANCE
-          </Link>
-          <nav className="main" aria-label="Principal">
-            {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className={n.cat ? 'cat' : undefined} aria-current={pathname === n.href ? 'page' : undefined}>
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="actions">
-            {ready && user ? (
-              <Link href={homeFor(user.role)} className="btn primary">
-                Ir a mi área
-              </Link>
-            ) : (
-              <>
-                <Link href="/login" className="btn ghost hide-sm">
-                  Entrar
-                </Link>
-                <Link href="/registro" className="btn primary hide-sm">
-                  Empezar ahora
-                </Link>
-              </>
-            )}
-            <button className="btn ghost menu-btn" aria-expanded={open} aria-controls="site-mobile-nav" aria-label="Menú" onClick={() => setOpen((v) => !v)}>
-              <Icon name={open ? 'x' : 'list'} />
-            </button>
-          </div>
-        </div>
-        <nav id="site-mobile-nav" className={`site-mobile-nav ${open ? 'open' : ''}`} aria-label="Menú móvil">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} onClick={() => setOpen(false)}>
+    <header className="site-header">
+      <div className="site-wrap">
+        <Link href={section ? '/p2p' : '/'} className="brand site-logo" aria-label={section ? `Valorize Finance ${section}` : 'Valorize Finance, inicio'}>
+          <span className="mark" aria-hidden>
+            V
+          </span>
+          <span>
+            <b>VALORIZE</b> FINANCE{section ? <em> · {section}</em> : null}
+          </span>
+        </Link>
+        <nav className="main" aria-label="Principal">
+          {nav.map((n) => (
+            <Link key={n.href} href={n.href} className={n.cat ? 'cat' : undefined} aria-current={pathname === n.href ? 'page' : undefined}>
               {n.label}
             </Link>
           ))}
-          {!user ? (
-            <Link href="/login" onClick={() => setOpen(false)}>
-              Entrar
+          {section ? (
+            <Link href="/" className="back">
+              ← Valorize Finance
             </Link>
           ) : null}
         </nav>
-      </header>
-    </>
+        <div className="actions">
+          {ready && user ? (
+            <Link href={homeFor(user.role)} className="btn primary">
+              Ir a mi área
+            </Link>
+          ) : (
+            <>
+              <Link href="/p2p/login" className="btn ghost hide-sm">
+                Entrar
+              </Link>
+              <Link href="/p2p/registro" className="btn primary hide-sm">
+                Solicitar acceso
+              </Link>
+            </>
+          )}
+          <button className="btn ghost menu-btn" aria-expanded={open} aria-controls="site-mobile-nav" aria-label="Menú" onClick={() => setOpen((v) => !v)}>
+            <Icon name={open ? 'x' : 'list'} />
+          </button>
+        </div>
+      </div>
+      <nav id="site-mobile-nav" className={`site-mobile-nav ${open ? 'open' : ''}`} aria-label="Menú móvil">
+        {all.map((n) => (
+          <Link key={n.href} href={n.href} onClick={() => setOpen(false)}>
+            {n.label}
+          </Link>
+        ))}
+        {!user ? (
+          <Link href="/p2p/login" onClick={() => setOpen(false)}>
+            Entrar
+          </Link>
+        ) : null}
+      </nav>
+    </header>
   );
 }
 
@@ -81,21 +101,23 @@ export function SiteFooter() {
               <b>VALORIZE</b> FINANCE
             </div>
             <p className="small muted" style={{ margin: 0, maxWidth: '34ch' }}>
-              Cambio presencial de USDT y USDC por euros, con cita previa, identidad verificada y cada operación comprobada en la blockchain.
+              Servicios financieros con activos digitales, con oficinas físicas, clientes identificados y cada operación comprobada.
             </p>
           </div>
           <div>
             <h4>P2P</h4>
             <Link href="/p2p">Cambio presencial</Link>
             <Link href="/p2p#simulador">Simulador</Link>
+            <Link href="/p2p/registro">Crear cuenta</Link>
             <Link href="/p2p#seguridad">Seguridad</Link>
-            <Link href="/justificante">Comprobar un justificante</Link>
+            <Link href="/p2p/justificante">Comprobar un justificante</Link>
           </div>
           <div>
-            <h4>Cuenta</h4>
-            <Link href="/registro">Crear cuenta</Link>
-            <Link href="/login">Entrar</Link>
+            <h4>Valorize</h4>
+            <Link href="/#nosotros">Nosotros</Link>
+            <Link href="/#principios">Cómo trabajamos</Link>
             <Link href="/#preguntas">Preguntas frecuentes</Link>
+            <Link href="/#contacto">Contacto</Link>
           </div>
           <div>
             <h4>Legal</h4>
@@ -116,7 +138,7 @@ export function SiteFooter() {
 }
 
 /** Botón fijo en el móvil. */
-export function StickyCta({ href = '/registro', label = 'Empezar ahora' }: { href?: string; label?: string }) {
+export function StickyCta({ href = '/p2p/registro', label = 'Solicitar acceso' }: { href?: string; label?: string }) {
   const { user } = useAuth();
   if (user) return null;
   return (
@@ -128,13 +150,13 @@ export function StickyCta({ href = '/registro', label = 'Empezar ahora' }: { hre
   );
 }
 
-export function SitePage({ children }: { children: ReactNode }) {
+export function SitePage({ children, nav, section }: { children: ReactNode; nav?: NavItem[]; section?: string }) {
   return (
     <div className="site">
       <a href="#contenido" className="sr-only">
         Saltar al contenido
       </a>
-      <SiteHeader />
+      <SiteHeader nav={nav} section={section} />
       <main id="contenido">{children}</main>
       <SiteFooter />
       <StickyCta />
@@ -178,7 +200,7 @@ export function Simulator({ cta = true }: { cta?: boolean }) {
       </div>
       <QuoteBox direction={direction} asset={asset} amount={amount} />
       {cta ? (
-        <Link href={user ? '/app/reservar' : '/registro'} className="btn primary">
+        <Link href={user ? '/p2p/app/reservar' : '/p2p/registro'} className="btn primary">
           Solicitar mi cambio
         </Link>
       ) : null}

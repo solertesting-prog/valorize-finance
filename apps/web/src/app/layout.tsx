@@ -5,7 +5,7 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: { default: 'Valorize Finance', template: '%s · Valorize Finance' },
-  description: 'Reserva tu visita, lleva tu QR en el móvil y haz el check-in en segundos.',
+  description: 'Valorize Finance: servicios financieros con activos digitales, oficinas físicas y clientes verificados. P2P: cambio presencial de USDT y USDC por euros.',
   applicationName: 'Valorize Finance',
 };
 

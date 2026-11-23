@@ -74,7 +74,7 @@ export function BookingAdminView({ id, basePath, apiBase }: { id: string; basePa
                   {b.customer.phone ? ` · ${b.customer.phone}` : ''}
                 </div>
                 {apiBase === '/admin' ? (
-                  <Link className="small" href={`/admin/clientes/${b.customer.id}`}>
+                  <Link className="small" href={`/p2p/admin/clientes/${b.customer.id}`}>
                     Ver ficha del cliente
                   </Link>
                 ) : null}
@@ -98,7 +98,7 @@ export function BookingAdminView({ id, basePath, apiBase }: { id: string; basePa
               <div className="row between">
                 <h2 style={{ fontSize: 'var(--t-lg)', margin: 0 }}>Operación de cambio</h2>
                 {apiBase === '/admin' ? (
-                  <Link className="small" href={`/admin/wallets/${b.exchange.wallet.id}`}>
+                  <Link className="small" href={`/p2p/admin/wallets/${b.exchange.wallet.id}`}>
                     Auditoría de la wallet
                   </Link>
                 ) : null}
@@ -116,7 +116,7 @@ export function BookingAdminView({ id, basePath, apiBase }: { id: string; basePa
           {b.status === 'PENDING' ? (
             <Alert kind="warn">
               Pendiente de aprobación.{' '}
-              {apiBase === '/admin' ? <Link href="/admin/solicitudes">Revisarla en Solicitudes</Link> : 'Un responsable debe aprobarla antes de la visita.'}
+              {apiBase === '/admin' ? <Link href="/p2p/admin/solicitudes">Revisarla en Solicitudes</Link> : 'Un responsable debe aprobarla antes de la visita.'}
             </Alert>
           ) : null}
           {b.status === 'REJECTED' ? <Alert kind="error">Rechazada: {b.rejectReason}</Alert> : null}

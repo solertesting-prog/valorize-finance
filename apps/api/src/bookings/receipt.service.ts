@@ -152,7 +152,7 @@ export class ReceiptService {
     p.rect(L, y, R - L, 58, [0.95, 0.97, 0.98]);
     p.text(L + 14, y + 12, 'Código de verificación', { size: 9, color: GREY });
     p.text(L + 14, y + 28, code, { size: 15, font: 'B' });
-    p.wrap(L + 210, y + 12, `Para comprobar que este justificante es auténtico, introduce la referencia ${b.reference} y este código en ${this.env.APP_URL.replace(/\/+$/, '')}/justificante.`, R - L - 224, { size: 8.5, color: GREY });
+    p.wrap(L + 210, y + 12, `Para comprobar que este justificante es auténtico, introduce la referencia ${b.reference} y este código en ${this.env.APP_URL.replace(/\/+$/, '')}/p2p/justificante.`, R - L - 224, { size: 8.5, color: GREY });
     y += 76;
     p.wrap(L, y, 'Documento informativo de la operación realizada en oficina. Las operaciones con criptoactivos pueden tener implicaciones fiscales; conserva este justificante.', R - L, { size: 8, color: GREY });
 

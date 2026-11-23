@@ -3,7 +3,7 @@
 import { LocationDto, NETWORK_LABEL, networkFullName, ChainNetwork } from '@valorize/shared';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { SitePage, Simulator } from '@/components/site';
+import { P2P_NAV, SitePage, Simulator } from '@/components/site';
 import { Icon } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -32,20 +32,20 @@ const SECURITY: [string, string, string][] = [
 ];
 
 const ACCOUNT: [string, string, string][] = [
-  ['/app/reservar', 'Solicitar un cambio', 'calendar'],
-  ['/app/reservas', 'Mis citas y QR', 'qr'],
-  ['/app/operaciones', 'Mis operaciones y justificantes', 'doc'],
-  ['/app/perfil', 'Mis wallets y verificación', 'wallet'],
+  ['/p2p/app/reservar', 'Solicitar un cambio', 'calendar'],
+  ['/p2p/app/reservas', 'Mis citas y QR', 'qr'],
+  ['/p2p/app/operaciones', 'Mis operaciones y justificantes', 'doc'],
+  ['/p2p/app/perfil', 'Mis wallets y verificación', 'wallet'],
 ];
 
 /** Categoría P2P: toda la plataforma de cambio presencial de Valorize. */
 export default function P2P() {
   const { user } = useAuth();
-  const start = user ? '/app/reservar' : '/registro';
+  const start = user ? '/p2p/app/reservar' : '/p2p/registro';
   const locs = useQuery({ queryKey: ['locations', 'public'], queryFn: () => api.get<LocationDto[]>('/locations') });
 
   return (
-    <SitePage>
+    <SitePage nav={P2P_NAV} section="P2P">
       <section className="s-hero">
         <div className="glow" aria-hidden />
         <div className="site-wrap grid2">
@@ -96,7 +96,7 @@ export default function P2P() {
         </div>
       </section>
 
-      <section className="s-section">
+      <section className="s-section" id="proceso">
         <div className="site-wrap">
           <div className="s-head">
             <span className="kicker">El proceso</span>
@@ -151,7 +151,7 @@ export default function P2P() {
                   <p>
                     {l.address}, {l.city}
                   </p>
-                  <Link href={user ? `/app/reservar?location=${l.id}` : '/registro'} className="btn sm" style={{ marginTop: 14 }}>
+                  <Link href={user ? `/p2p/app/reservar?location=${l.id}` : '/p2p/registro'} className="btn sm" style={{ marginTop: 14 }}>
                     Reservar aquí
                   </Link>
                 </article>
@@ -172,7 +172,7 @@ export default function P2P() {
           </div>
           <div className="s-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))' }}>
             {ACCOUNT.map(([href, t, icon]) => (
-              <Link key={href} href={user ? href : `/login?next=${encodeURIComponent(href)}`} className="s-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <Link key={href} href={user ? href : `/p2p/login?next=${encodeURIComponent(href)}`} className="s-card" style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div className="ico" aria-hidden>
                   <Icon name={icon} size={22} />
                 </div>
@@ -182,7 +182,7 @@ export default function P2P() {
             ))}
           </div>
           <p className="center small muted" style={{ marginTop: 20 }}>
-            ¿Te han dado un justificante? <Link href="/justificante">Comprueba que es auténtico</Link>.
+            ¿Te han dado un justificante? <Link href="/p2p/justificante">Comprueba que es auténtico</Link>.
           </p>
         </div>
       </section>

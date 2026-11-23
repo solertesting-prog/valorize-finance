@@ -183,7 +183,7 @@ export class BookingsService {
       title: approved ? 'Solicitud aprobada' : 'Reserva confirmada',
       body: `${booking.service.name} en ${booking.location.name}, ${when}. Referencia ${booking.reference}. Muestra tu QR al llegar.`,
       data: { bookingId: booking.id },
-      email: { cta: { label: 'Ver mi QR', url: `${this.env.APP_URL}/app/reservas/${booking.id}` } },
+      email: { cta: { label: 'Ver mi QR', url: `${this.env.APP_URL}/p2p/app/reservas/${booking.id}` } },
     });
   }
 
@@ -623,7 +623,7 @@ export class BookingsService {
           ? `Tu solicitud ${updated.reference} es ahora para el ${when} en ${updated.location.name}. La revisaremos de nuevo y te avisaremos.`
           : `Tu cita ${updated.reference} es ahora el ${when} en ${updated.location.name}. Tu QR se ha actualizado.`,
       data: { bookingId: updated.id },
-      email: { cta: { label: 'Ver mi QR', url: `${this.env.APP_URL}/app/reservas/${updated.id}` } },
+      email: { cta: { label: 'Ver mi QR', url: `${this.env.APP_URL}/p2p/app/reservas/${updated.id}` } },
     });
     void this.webhooks.emit(WebhookEvent.BOOKING_RESCHEDULED, {
       ...webhookPayload(updated),
@@ -880,7 +880,7 @@ export class BookingsService {
         title: 'Recordatorio de tu cita',
         body: `${b.service.name} en ${b.location.name} (${b.location.address}), ${when}. Ten tu QR a mano.`,
         data: { bookingId: b.id },
-        email: { cta: { label: 'Ver mi QR', url: `${this.env.APP_URL}/app/reservas/${b.id}` } },
+        email: { cta: { label: 'Ver mi QR', url: `${this.env.APP_URL}/p2p/app/reservas/${b.id}` } },
       });
     }
     return due.length;
