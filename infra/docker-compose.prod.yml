@@ -12,6 +12,9 @@ services:
     environment:
       APP_DOMAIN: ${APP_DOMAIN}
       API_DOMAIN: ${API_DOMAIN}
+      # Direcciones anteriores: la web redirige al dominio actual y la API sigue respondiendo (apps ya instaladas).
+      LEGACY_APP_DOMAIN: ${LEGACY_APP_DOMAIN:-legacy.localhost}
+      LEGACY_API_DOMAIN: ${LEGACY_API_DOMAIN:-api.legacy.localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

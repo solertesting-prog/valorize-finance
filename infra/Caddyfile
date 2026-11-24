@@ -18,8 +18,8 @@
 	reverse_proxy web:3000
 }
 
-# API pública para la app móvil.
-{$API_DOMAIN} {
+# API pública para la app móvil (también en la dirección anterior, para las apps ya instaladas).
+{$API_DOMAIN}, {$LEGACY_API_DOMAIN} {
 	encode zstd gzip
 	header {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
@@ -32,4 +32,9 @@
 		health_uri /health/ready
 		health_interval 10s
 	}
+}
+
+# www y la dirección anterior redirigen al dominio principal, conservando la ruta (QR, PDF y emails ya enviados).
+www.{$APP_DOMAIN}, {$LEGACY_APP_DOMAIN} {
+	redir https://{$APP_DOMAIN}{uri} permanent
 }
